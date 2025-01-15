@@ -34,7 +34,6 @@ async def create_new_project(
             status_code=400,
             detail="Failed to create project",
         )
-    print(dbproject)
     return dbproject
 
 
