@@ -1,16 +1,23 @@
+import base64
+import hashlib
 from typing import Any, Dict, List, Optional
 
 from bson import ObjectId
 from cryptography.fernet import Fernet
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..core.config import database_name, environments_collection_name
+from ..core.config import SECRET_KEY, database_name, environments_collection_name
 from ..models.dbmodel import PyObjectId
 from ..models.environment import EnvironmentCreate, EnvironmentInDB
 
 collection_name = environments_collection_name
 
 # Función auxiliar para cifrar un diccionario
+
+# Generar una clave para el cifrado, en un entorno real, esta clave debería ser almacenada de manera segura
+hash_object = hashlib.sha256(str(SECRET_KEY).encode())
+key = base64.urlsafe_b64encode(hash_object.digest())
+fernet = Fernet(key)
 
 
 def encrypt_secrets(secrets: Dict[str, Any]) -> Dict[str, str]:

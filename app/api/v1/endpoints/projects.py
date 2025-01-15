@@ -20,9 +20,7 @@ from ....services.projects import (
     update_project,
 )
 
-router = APIRouter(
-    tags=['Projects']
-)
+router = APIRouter(tags=['projects'])
 
 
 @router.post("/projects/", response_model=ProjectInDb, tags=["projects"], status_code=201)

@@ -13,9 +13,7 @@ from ....services.organizations import (
     update_organization,
 )
 
-router = APIRouter(
-    tags=['Organization']
-)
+router = APIRouter(tags=['organizations'])
 
 
 @router.post("/organizations/", response_model=OrganizationInDB)
