@@ -2,6 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from .dbmodel import DBModelMixin
 from .rwmodel import RWModel
 
 
@@ -15,7 +16,10 @@ class OrganizationCreate(OrganizationBase):
 
 
 class Organization(OrganizationBase):
-    id: str
-
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+
+class OrganizationInDB(DBModelMixin, Organization):
+    class Config:
+        from_attributes = True
