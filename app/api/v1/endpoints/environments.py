@@ -46,18 +46,6 @@ async def get_environment(
     return environment
 
 
-@router.get("/environments/", response_model=ManyEnvironmentsInResponse, tags=["environments"])
-async def get_all_environments_route(
-    project_id: Optional[str] = Query(
-        None, description="ID del proyecto para filtrar entornos"),
-    limit: int = Query(20, gt=0),
-    offset: int = Query(0, ge=0),
-    db: AsyncIOMotorClient = Depends(get_database),
-):
-    environments = await get_all_environments(db, project_id, limit, offset)
-    return ManyEnvironmentsInResponse(environments=environments, environments_count=len(environments))
-
-
 @router.put("/environments/{id}", response_model=EnvironmentInDB, tags=["environments"])
 async def update_environment_route(
     id: str = Path(..., min_length=1),

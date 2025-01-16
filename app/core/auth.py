@@ -30,4 +30,5 @@ async def get_current_user(token: Optional[str] = Header(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
         return UserInDB(**user)
     except Exception as e:
-        raise ValueError(f"Error al obtener datos del usuario de GitHub: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
