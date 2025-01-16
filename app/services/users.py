@@ -10,6 +10,13 @@ from ..models.user import UserCreate, UserInDB
 collection_name = users_collection_name
 
 
+async def get_user_by_username(conn: AsyncIOMotorClient, username: str) -> Optional[UserInDB]:
+    user = await conn[database_name][collection_name].find_one({"username": username})
+    if user:
+        return UserInDB(**user)
+    return None
+
+
 async def get_or_create_user(conn: AsyncIOMotorClient, github_token: str) -> UserInDB:
     # Create Github instance
 

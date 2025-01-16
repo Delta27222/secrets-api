@@ -15,7 +15,7 @@ class UserBase(RWModel):
 
 
 class UserCreate(UserBase):
-    pass  # No necesitamos campos adicionales para la creación
+    pass
 
 
 class User(UserBase):

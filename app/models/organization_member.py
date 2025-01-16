@@ -25,7 +25,8 @@ class MembershipStatus(str, Enum):
 
 class OrganizationMemberBase(RWModel):
     organization_id: str = Field(..., alias="organization_id")
-    user_id: str = Field(..., alias="user_id")
+    # Is the username in github
+    username: str = Field(...)
     role: OrganizationRole = Field(..., alias="role")
     status: MembershipStatus = Field(MembershipStatus.pending, alias="status")
 
@@ -47,8 +48,8 @@ class OrganizationMemberInDB(DBModelMixin, OrganizationMember):
         from_attributes = True
 
 
-class OrganizationInResponse(OrganizationMemberInDB):
-    user: UserInDB
+class OrganizationMemberInResponse(OrganizationMemberInDB):
+    user: Optional[UserInDB]
     organization: OrganizationInDB
 
     class Config:

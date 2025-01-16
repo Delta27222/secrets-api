@@ -3,8 +3,10 @@ from typing import List, Optional
 from bson import ObjectId
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 
+from ....core.auth import get_current_user
 from ....db.mongodb import AsyncIOMotorClient, get_database
 from ....models.organization import Organization, OrganizationCreate, OrganizationInDB
+from ....models.user import UserInDB
 from ....services.organizations import (
     create_organization,
     delete_organization,
@@ -17,8 +19,14 @@ router = APIRouter(tags=['organizations'])
 
 
 @router.post("/organizations/", response_model=OrganizationInDB)
-async def create_new_organization(organization: OrganizationCreate, db: AsyncIOMotorClient = Depends(get_database)):
-    return await create_organization(db, organization)
+async def create_new_organization(
+    organization: OrganizationCreate,
+    db: AsyncIOMotorClient = Depends(
+        get_database),
+    current_user: UserInDB = Depends(
+        get_current_user)
+):
+    return await create_organization(db, organization, current_user.username)
 
 
 @router.get("/organizations/{id}", response_model=OrganizationInDB)
