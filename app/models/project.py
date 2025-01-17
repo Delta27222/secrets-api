@@ -8,16 +8,22 @@ from .rwmodel import RWModel
 
 
 class ProjectBase(RWModel):
-    organization_id: PyObjectId
     name: str
     slug: str
 
 
 class ProjectCreate(ProjectBase):
+    organization_id: PyObjectId
+    pass
+
+
+class ProjectUpdate(ProjectBase):
     pass
 
 
 class Project(ProjectBase):
+    organization_id: PyObjectId
+
     class Config:
         from_attributes = True
 

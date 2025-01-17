@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 
+from ....core.auth import get_current_user
 from ....core.utils import create_aliased_response
 from ....db.mongodb import AsyncIOMotorClient, get_database
 from ....models.environment import (
@@ -10,6 +11,7 @@ from ....models.environment import (
     EnvironmentUpdate,
     ManyEnvironmentsInResponse,
 )
+from ....models.user import UserInDB
 from ....services.environment import (
     create_environment,
     delete_environment,
@@ -26,6 +28,8 @@ router = APIRouter(tags=['environments'])
 async def create_new_environment(
     environment: EnvironmentCreate = Body(..., embed=True),
     db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(
+        get_current_user)
 ):
     new_environment = await create_environment(db, environment)
     if not new_environment:
@@ -38,6 +42,8 @@ async def create_new_environment(
 async def get_environment(
     id: str = Path(..., min_length=1),
     db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(
+        get_current_user)
 ):
     environment = await get_environment_by_id(db, id)
     if not environment:
@@ -51,6 +57,8 @@ async def update_environment_route(
     id: str = Path(..., min_length=1),
     environment: EnvironmentUpdate = Body(..., embed=True),
     db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(
+        get_current_user)
 ):
     updated_environment = await update_environment(db, id, environment)
     if not updated_environment:
@@ -63,6 +71,8 @@ async def update_environment_route(
 async def delete_environment_route(
     id: str = Path(..., min_length=1),
     db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(
+        get_current_user)
 ):
     if not await delete_environment(db, id):
         raise HTTPException(

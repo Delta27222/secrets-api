@@ -32,7 +32,7 @@ async def invite_to_organization(
     db: AsyncIOMotorClient = Depends(get_database),
     current_user: UserInDB = Depends(get_current_user)
 ):
-    # Aquí deberías verificar si el usuario actual tiene permisos para invitar a otros
+    # Verify user has permissions to invite
     if not is_admin_for_organization(db, current_user.username, organization_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para invitar a esta organización")

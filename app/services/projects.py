@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from ..core.config import database_name, projects_collection_name
 from ..models.dbmodel import PyObjectId
 from ..models.environment import EnvironmentCreate
-from ..models.project import ProjectCreate, ProjectInDb
+from ..models.project import ProjectCreate, ProjectInDb, ProjectUpdate
 from .environment import create_environment
 
 collection_name = projects_collection_name
@@ -48,12 +48,11 @@ async def get_all_projects(conn: AsyncIOMotorClient) -> List[ProjectInDb]:
     return projects
 
 
-async def update_project(conn: AsyncIOMotorClient, id: str, project: ProjectCreate) -> Optional[ProjectInDb]:
-    result = await conn[database_name][collection_name].update_one({"_id": ObjectId(id)}, {"$set": project.dict()})
-    if result.modified_count == 1:
-        updated_project = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
-        return ProjectInDb(**updated_project)
-    return None
+async def update_project(conn: AsyncIOMotorClient, id: str, project: ProjectUpdate) -> Optional[ProjectInDb]:
+
+    result = await conn[database_name][collection_name].update_one({"_id": ObjectId(id)}, {"$set": project.model_dump()})
+    updated_project = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+    return ProjectInDb(**updated_project)
 
 
 async def delete_project(conn: AsyncIOMotorClient, id: str) -> bool:

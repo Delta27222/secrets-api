@@ -7,7 +7,7 @@ import requests
 import typer
 from dotenv.main import load_dotenv
 from github import Github
-from oauthcli import GitHubAuth
+from oauthcli import GitHubAuth, clean
 from starlette.datastructures import Secret
 
 load_dotenv(".env")
@@ -19,11 +19,10 @@ client_secret = Secret(os.getenv("CLIENT_SECRET"))
 
 
 def loading_animation():
-    # Caracteres para la animación de carga
     spinner = cycle('|/-\\')
-    for _ in range(10):  # 10 iteraciones para el ejemplo
+    for _ in range(10):
         typer.echo(f"\r⏳ Loading... {next(spinner)}", nl=False)
-        time.sleep(0.1)  # Un pequeño delay para que se vea la animación
+        time.sleep(0.1)
     typer.echo()
 
 
@@ -31,6 +30,7 @@ def loading_animation():
 def login():
     """Inicia sesión con GitHub para obtener un token de acceso."""
     try:
+        # clean.main()
         typer.echo("🔐 Authentication flow with Github ")
         loading_animation()
         auth = GitHubAuth(
@@ -53,17 +53,16 @@ def login():
         else:
             typer.echo(
                 f"Failed to fetch user data: {response.status_code}")
-
     except Exception as e:
         typer.echo(f"❌ Error de autenticación: {e}")
 
 
-@ cli.command()
+@cli.command()
 def hello(name: str):
     print(f"Hello {name}")
 
 
-@ cli.command()
+@cli.command()
 def goodbye(name: str, formal: bool = False):
     if formal:
         print(f"Goodbye Ms. {name}. Have a good day.")

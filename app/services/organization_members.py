@@ -23,7 +23,6 @@ collection_name = organization_members_collection_name
 
 async def is_admin_for_organization(db: AsyncIOMotorClient, username: str, organization_id: str) -> bool:
     member = await get_organization_member_by_username_and_org(db, username, organization_id)
-
     return member is not None and member.role in ["admin", "owner"] and member.status == MembershipStatus.accepted
 
 
@@ -98,6 +97,7 @@ async def get_organization_member_by_username_and_org(conn: AsyncIOMotorClient, 
         "organization_id": organization_id,
         "username": username
     })
+    print(member, organization_id, username)
     if member:
         user = await get_user_by_username(conn, username)
         organization = await get_organization_by_id(conn, organization_id)
