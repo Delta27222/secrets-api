@@ -12,7 +12,7 @@ from .environment import create_environment
 collection_name = projects_collection_name
 
 
-async def create_project(conn: AsyncIOMotorClient, project: ProjectCreate, organization_id: PyObjectId) -> ProjectInDb:
+async def create_project(conn: AsyncIOMotorClient, project: ProjectCreate, organization_id: PyObjectId, creator_user_id: str) -> ProjectInDb:
     project_dict = project.model_dump()
     project_dict["organization_id"] = organization_id
     result = await conn[database_name][collection_name].insert_one(project_dict)

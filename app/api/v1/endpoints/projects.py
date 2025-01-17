@@ -38,7 +38,7 @@ async def create_new_project(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para crear proyectos en esta organización")
 
-    dbproject = await create_project(db, project, organization_id=project.organization_id)
+    dbproject = await create_project(db, project, project.organization_id, current_user.id)
     if not dbproject:
         raise HTTPException(
             status_code=400,
