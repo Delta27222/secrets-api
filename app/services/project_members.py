@@ -16,6 +16,7 @@ from ..models.project_member import (
     ProjectMemberInDB,
     ProjectMemberUpdate,
 )
+from .environment import get_environment_by_id
 from .organization_members import is_admin_for_organization
 from .organizations import get_organization_by_id
 from .users import get_user_by_id, get_user_by_username
@@ -54,6 +55,10 @@ async def _get_project_by_id(conn: AsyncIOMotorClient, id: str) -> Optional[Proj
     return None
 
 
+# Returns boolean is project admin
+# returns true if:
+# user is org admin or owner
+# user is project admin
 async def is_project_admin(conn: AsyncIOMotorClient, project_id: str, user_id: str):
     project = await _get_project_by_id(conn, project_id)
     if not project:
@@ -61,7 +66,7 @@ async def is_project_admin(conn: AsyncIOMotorClient, project_id: str, user_id: s
             status_code=404, detail=f"Project with id '{project_id}' not found")
 
     organization = await get_organization_by_id(conn, project.organization_id)
-    if not project:
+    if not organization:
         raise HTTPException(
             status_code=404, detail=f"Organization with id '{project.organization_id}' not found")
 
@@ -74,3 +79,81 @@ async def is_project_admin(conn: AsyncIOMotorClient, project_id: str, user_id: s
 async def delete_project_member(conn: AsyncIOMotorClient, member_id: str) -> bool:
     result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(member_id)})
     return result.deleted_count == 1
+
+
+async def get_project_member_by_environment_and_user(conn: AsyncIOMotorClient, environment_id: str, user_id: str):
+    environment = await get_environment_by_id(conn, environment_id)
+    if not environment:
+        raise HTTPException(
+            status_code=404, detail=f"Environment with id '{environment_id}' not found")
+
+    project = await _get_project_by_id(conn, environment.project_id)
+    if not project:
+        raise HTTPException(
+            status_code=404, detail=f"Project with id '{environment.project}' not found")
+
+    user = await get_user_by_id(conn, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=404, detail=f"User with id '{user_id}' not found")
+
+    project_member = await get_project_member_by_user_id(conn, project.id, user_id)
+    return project_member
+
+
+async def can_access_environment(conn: AsyncIOMotorClient, environment_id: str, user_id: str) -> bool:
+    environment = await get_environment_by_id(conn, environment_id)
+    if not environment:
+        raise HTTPException(
+            status_code=404, detail=f"Environment with id '{environment_id}' not found")
+
+    project = await _get_project_by_id(conn, environment.project_id)
+    if not project:
+        raise HTTPException(
+            status_code=404, detail=f"Project with id '{environment.project}' not found")
+
+    user = await get_user_by_id(conn, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=404, detail=f"User with id '{user_id}' not found")
+
+    # Verify if the user is admin for organization
+    if await is_admin_for_organization(conn, user.username, project.organization_id):
+        return True
+
+    # Verify if user is project member
+    project_member = await get_project_member_by_user_id(conn, project.id, user_id)
+    if project_member:
+        # All project member can read environment
+        return project_member.role in ["admin", "collab", "viewer"]
+
+    return False
+
+
+async def can_update_environment(conn: AsyncIOMotorClient, environment_id: str, user_id: str) -> bool:
+    environment = await get_environment_by_id(conn, environment_id)
+    if not environment:
+        raise HTTPException(
+            status_code=404, detail=f"Environment with id '{environment_id}' not found")
+
+    project = await _get_project_by_id(conn, environment.project_id)
+    if not project:
+        raise HTTPException(
+            status_code=404, detail=f"Project with id '{environment.project}' not found")
+
+    user = await get_user_by_id(conn, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=404, detail=f"User with id '{user_id}' not found")
+
+    # Verify if the user is admin for organization
+    if await is_admin_for_organization(conn, user.username, project.organization_id):
+        return True
+
+    # Verify if user is project member
+    project_member = await get_project_member_by_user_id(conn, project.id, user_id)
+    if project_member:
+        # All project member can read environment
+        return project_member.role in ["admin", "collab"]
+
+    return False

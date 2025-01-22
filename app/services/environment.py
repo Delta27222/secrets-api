@@ -48,6 +48,8 @@ async def get_environment_by_id(conn: AsyncIOMotorClient, id: str) -> Optional[E
     return None
 
 
+# All envs are not decrypted.
+# To decrypt a env must be call by specific id
 async def get_all_environments(
     conn: AsyncIOMotorClient,
     project_id: Optional[str] = None,
@@ -60,7 +62,8 @@ async def get_all_environments(
 
     environments = []
     async for env in conn[database_name][collection_name].find(query).skip(offset).limit(limit):
-        env['secrets'] = decrypt_secrets(env['secrets'])
+        # env['secrets'] = decrypt_secrets(env['secrets'])
+        env['secrets'] = {}
         environments.append(EnvironmentInDB(**env))
     return environments
 
