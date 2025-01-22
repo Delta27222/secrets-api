@@ -67,7 +67,7 @@ async def get_project(
     dbproject = await get_project_by_id(db, id)
     if not await is_admin_for_organization(db, current_user.username, dbproject.organization_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="No tienes permiso para obtener proyectos en esta organización")
+                            detail="No tienes permiso para obtener el proyecto {id}")
 
     if not dbproject:
         raise HTTPException(
@@ -77,6 +77,8 @@ async def get_project(
     return create_aliased_response(dbproject)
 
 
+# View environments of project
+# Only view name and slug
 @router.get("/projects/{id}/environments", response_model=ManyEnvironmentsInResponse, tags=["environments"])
 async def get_environments_by_project(
     id: str,
@@ -107,9 +109,14 @@ async def get_project_members_route(
     db: AsyncIOMotorClient = Depends(get_database),
     current_user: UserInDB = Depends(get_current_user)
 ) -> List[ProjectMemberInDB]:
-    if not await is_project_admin(db, project_id, current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="No tienes permiso para añadir miembros a este proyecto")
+    member = await get_project_member_by_user_id(db, project_id, current_user.id)
+    if not member:
+        raise HTTPException(status_code=status.HTTP_401_FORBIDDEN,
+                            detail="No tienes permiso para ver los miembros")
+
+    # if not await is_project_admin(db, project_id, current_user.id):
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+    #                         detail="No tienes permiso para ver los miembros")
     members = await get_project_members(db, project_id)
     return members
 
@@ -149,8 +156,8 @@ async def update_project_route(
             status_code=404,
             detail=f"Project with id '{id}' not found",
         )
-    is_organization_admin = await is_admin_for_organization(db, current_user.username, dbproject.organization_id)
-    if not is_organization_admin:
+    is_admin = await is_project_admin(db, dbproject.organization_id, current_user.id)
+    if not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para actualizar este proyecto")
 
