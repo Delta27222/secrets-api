@@ -15,6 +15,7 @@ from ....services.project_members import (
     create_project_member,
     delete_project_member,
     get_project_member_by_id,
+    get_project_member_by_user_id,
     get_project_members,
     is_project_admin,
     update_project_member,
@@ -37,6 +38,11 @@ async def create_project_member_route(
     if project_member.project != project_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="El ID del proyecto no coincide con la ruta")
+
+    existing_member = await get_project_member_by_user_id(db, project_id, current_user.id)
+    if existing_member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Miembro de proyecto ya existente")
 
     new_member = await create_project_member(db, project_member)
     return new_member

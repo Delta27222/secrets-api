@@ -35,6 +35,11 @@ async def get_project_member_by_id(conn: AsyncIOMotorClient, id: str) -> Project
 
 async def create_project_member(conn: AsyncIOMotorClient, project_member: ProjectMemberCreate) -> ProjectMemberInDB:
     project_member_dict = project_member.model_dump()
+    user = await get_user_by_id(conn, project_member.user)
+    if not user:
+        raise HTTPException(
+            status_code=404, detail=f"User with id '{project_member.user}' not found")
+
     result = await conn[database_name][collection_name].insert_one(project_member_dict)
     new_member = await conn[database_name][collection_name].find_one({"_id": result.inserted_id})
     return ProjectMemberInDB(**new_member)
