@@ -14,6 +14,7 @@ from ..models.project import ProjectInDb
 from ..models.project_member import (
     ProjectMemberCreate,
     ProjectMemberInDB,
+    ProjectMemberInResponse,
     ProjectMemberUpdate,
 )
 from .environment import get_environment_by_id
@@ -22,6 +23,14 @@ from .organizations import get_organization_by_id
 from .users import get_user_by_id, get_user_by_username
 
 collection_name = project_members_collection_name
+
+
+async def get_project_member_by_id(conn: AsyncIOMotorClient, id: str) -> ProjectMemberInDB:
+    member = conn[database_name][project_members_collection_name].find_one({
+        "_id": ObjectId(id)})
+    if member:
+        return ProjectMemberInDB(**member)
+    return None
 
 
 async def create_project_member(conn: AsyncIOMotorClient, project_member: ProjectMemberCreate) -> ProjectMemberInDB:
@@ -79,6 +88,15 @@ async def is_project_admin(conn: AsyncIOMotorClient, project_id: str, user_id: s
 async def delete_project_member(conn: AsyncIOMotorClient, member_id: str) -> bool:
     result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(member_id)})
     return result.deleted_count == 1
+
+
+async def get_project_members(conn: AsyncIOMotorClient, project_id: str) -> List[ProjectMemberInResponse]:
+    members = []
+    async for member in conn[database_name][collection_name].find({"project": project_id}):
+        member['user'] = await get_user_by_id(conn, member['user'])
+        member['project'] = await _get_project_by_id(conn, member['project'])
+        members.append(ProjectMemberInResponse(**member))
+    return members
 
 
 async def get_project_member_by_environment_and_user(conn: AsyncIOMotorClient, environment_id: str, user_id: str):

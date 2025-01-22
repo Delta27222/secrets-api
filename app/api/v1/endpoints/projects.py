@@ -13,6 +13,7 @@ from ....models.project import (
     ProjectInDb,
     ProjectUpdate,
 )
+from ....models.project_member import ProjectMemberInDB, ProjectMemberInResponse
 from ....models.user import UserInDB
 from ....services.environment import (
     get_all_environments_by_project,
@@ -22,6 +23,8 @@ from ....services.organization_members import is_admin_for_organization
 from ....services.project_members import (
     can_access_environment,
     get_project_member_by_user_id,
+    get_project_members,
+    is_project_admin,
 )
 from ....services.projects import (
     create_project,
@@ -98,6 +101,19 @@ async def get_environments_by_project(
     return ManyEnvironmentsInResponse(environments=environments, environments_count=len(environments))
 
 
+@router.get("/projects/{project_id}/members", response_model=List[ProjectMemberInResponse])
+async def get_project_members_route(
+    project_id: str,
+    db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(get_current_user)
+) -> List[ProjectMemberInDB]:
+    if not await is_project_admin(db, project_id, current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="No tienes permiso para añadir miembros a este proyecto")
+    members = await get_project_members(db, project_id)
+    return members
+
+
 @router.get("/projects/{id}/{slug}", response_model=EnvironmentInDB, tags=["environments"])
 async def get_environment_by_slug_route(
     slug: str = Path(..., min_length=1),
@@ -110,7 +126,7 @@ async def get_environment_by_slug_route(
 
     if not environment:
         raise HTTPException(
-            status_code=404, detail=f"Environment with id '{id}' not found")
+            status_code=404, detail=f"Environment with slug '{slug}' in project {id} not found")
 
     can_read = await can_access_environment(db, environment.id, current_user.id)
     if not can_read:
