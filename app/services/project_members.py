@@ -1,0 +1,76 @@
+from typing import List, Optional
+
+from bson import ObjectId
+from fastapi import HTTPException
+from motor.motor_asyncio import AsyncIOMotorClient
+
+from ..core.config import (
+    database_name,
+    organizations_collection_name,
+    project_members_collection_name,
+    projects_collection_name,
+)
+from ..models.project import ProjectInDb
+from ..models.project_member import (
+    ProjectMemberCreate,
+    ProjectMemberInDB,
+    ProjectMemberUpdate,
+)
+from .organization_members import is_admin_for_organization
+from .organizations import get_organization_by_id
+from .users import get_user_by_id, get_user_by_username
+
+collection_name = project_members_collection_name
+
+
+async def create_project_member(conn: AsyncIOMotorClient, project_member: ProjectMemberCreate) -> ProjectMemberInDB:
+    project_member_dict = project_member.model_dump()
+    result = await conn[database_name][collection_name].insert_one(project_member_dict)
+    new_member = await conn[database_name][collection_name].find_one({"_id": result.inserted_id})
+    return ProjectMemberInDB(**new_member)
+
+
+async def update_project_member(conn: AsyncIOMotorClient, member_id: str, project_member: ProjectMemberUpdate) -> Optional[ProjectMemberInDB]:
+    update_data = project_member.model_dump(exclude_unset=True)
+    result = await conn[database_name][collection_name].update_one({"_id": ObjectId(member_id)}, {"$set": update_data})
+    if result.modified_count == 1:
+        updated_member = await conn[database_name][collection_name].find_one({"_id": ObjectId(member_id)})
+        return ProjectMemberInDB(**updated_member)
+    return None
+
+
+async def get_project_member_by_user_id(conn: AsyncIOMotorClient, project_id: str, user_id: str) -> Optional[ProjectMemberInDB]:
+    member = await conn[database_name][collection_name].find_one({"project": project_id, "user": user_id})
+    if member:
+        return ProjectMemberInDB(**member)
+    return None
+
+
+async def _get_project_by_id(conn: AsyncIOMotorClient, id: str) -> Optional[ProjectInDb]:
+    project = await conn[database_name][projects_collection_name].find_one({"_id": ObjectId(id)})
+    if project:
+        # Si necesitas informacion de la organization, puede popularse aqui
+        return ProjectInDb(**project)
+    return None
+
+
+async def is_project_admin(conn: AsyncIOMotorClient, project_id: str, user_id: str):
+    project = await _get_project_by_id(conn, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=404, detail=f"Project with id '{project_id}' not found")
+
+    organization = await get_organization_by_id(conn, project.organization_id)
+    if not project:
+        raise HTTPException(
+            status_code=404, detail=f"Organization with id '{project.organization_id}' not found")
+
+    user_project_member = await get_project_member_by_user_id(conn, project_id, user_id)
+    user = await get_user_by_id(conn, user_id)
+    is_organization_admin = await is_admin_for_organization(conn, user.username, organization.id)
+    return user_project_member is not None and (user_project_member.role in ["admin"] or is_organization_admin)
+
+
+async def delete_project_member(conn: AsyncIOMotorClient, member_id: str) -> bool:
+    result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(member_id)})
+    return result.deleted_count == 1

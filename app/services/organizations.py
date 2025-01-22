@@ -7,6 +7,8 @@ from ..core.config import (
     database_name,
     organization_members_collection_name,
     organizations_collection_name,
+    project_members_collection_name,
+    projects_collection_name,
 )
 from ..models.organization import Organization, OrganizationCreate, OrganizationInDB
 from ..models.organization_member import (
@@ -16,6 +18,7 @@ from ..models.organization_member import (
     OrganizationMemberInResponse,
     OrganizationRole,
 )
+from ..models.project import ProjectInDb
 from .users import get_user_by_username
 
 collection_name = organizations_collection_name

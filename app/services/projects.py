@@ -1,13 +1,21 @@
 from typing import List, Optional
 
 from bson import ObjectId
+from fastapi import HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..core.config import database_name, projects_collection_name
+from ..core.config import (
+    database_name,
+    project_members_collection_name,
+    projects_collection_name,
+)
 from ..models.dbmodel import PyObjectId
 from ..models.environment import EnvironmentCreate
 from ..models.project import ProjectCreate, ProjectInDb, ProjectUpdate
+from ..models.project_member import ProjectMemberCreate, ProjectRole
 from .environment import create_environment
+from .organization_members import is_admin_for_organization
+from .project_members import create_project_member
 
 collection_name = projects_collection_name
 
@@ -27,9 +35,24 @@ async def create_project(conn: AsyncIOMotorClient, project: ProjectCreate, organ
     prd_environment = EnvironmentCreate(
         project_id=new_project.id, name='Production', slug='prd')
 
-    await create_environment(conn=conn, environment=dev_environment)
-    await create_environment(conn=conn, environment=stg_environment)
-    await create_environment(conn=conn, environment=prd_environment)
+    admin_project_member = ProjectMemberCreate(
+        project=new_project.id, user=creator_user_id, role=ProjectRole.admin)
+    try:
+        await create_project_member(conn, project_member=admin_project_member)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail='Cannot create project member for new project'
+        )
+
+    try:
+        await create_environment(conn=conn, environment=dev_environment)
+        await create_environment(conn=conn, environment=stg_environment)
+        await create_environment(conn=conn, environment=prd_environment)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail='Environments creation result in error for new project'
+        )
+
     return new_project
 
 
@@ -58,3 +81,24 @@ async def update_project(conn: AsyncIOMotorClient, id: str, project: ProjectUpda
 async def delete_project(conn: AsyncIOMotorClient, id: str) -> bool:
     result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(id)})
     return result.deleted_count == 1
+
+
+async def get_projects_for_user_in_organization(conn: AsyncIOMotorClient, username: str, organization_id: str) -> List[ProjectInDb]:
+    is_admin = await is_admin_for_organization(conn, username, organization_id)
+
+    if is_admin:
+
+        projects = []
+        async for project in conn[database_name][projects_collection_name].find({"organization_id": organization_id}):
+            projects.append(ProjectInDb(**project))
+        return projects
+    else:
+        project_ids = []
+        async for member in conn[database_name][project_members_collection_name].find({"user": username, "organization_id": organization_id}):
+            project_ids.append(member['project'])
+
+        projects = []
+        if project_ids:
+            async for project in conn[database_name][projects_collection_name].find({"_id": {"$in": [ObjectId(pid) for pid in project_ids]}}):
+                projects.append(ProjectInDb(**project))
+        return projects

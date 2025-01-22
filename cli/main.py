@@ -38,6 +38,7 @@ def login():
             client_secret=client_secret,
             scopes=["user"],
         )
+        auth.logout()
         auth = auth.auth_server()
         authorized = auth.authorized
         if authorized:

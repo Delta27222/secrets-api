@@ -6,6 +6,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 from ....core.auth import get_current_user
 from ....db.mongodb import AsyncIOMotorClient, get_database
 from ....models.organization import Organization, OrganizationCreate, OrganizationInDB
+from ....models.project import ProjectInDb
 from ....models.user import UserInDB
 from ....services.organizations import (
     create_organization,
@@ -14,6 +15,7 @@ from ....services.organizations import (
     get_organization_by_id,
     update_organization,
 )
+from ....services.projects import get_projects_for_user_in_organization
 
 router = APIRouter(tags=['organizations'])
 
@@ -48,6 +50,17 @@ async def update(id: str, organization: OrganizationCreate, db: AsyncIOMotorClie
     if updated_org is None:
         raise HTTPException(status_code=404, detail="Organization not found")
     return updated_org
+
+
+@router.get("/organizations/{id}/projects/me", response_model=List[ProjectInDb])
+async def get_user_projects(
+    id: str,
+    db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(get_current_user)
+):
+    # Get all proejcts of user in an organization
+    projects = await get_projects_for_user_in_organization(db, current_user.username, id)
+    return projects
 
 
 @router.delete("/organizations/{id}", status_code=204)
