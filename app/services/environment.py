@@ -48,6 +48,15 @@ async def get_environment_by_id(conn: AsyncIOMotorClient, id: str) -> Optional[E
     return None
 
 
+async def get_environment_by_slug(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentInDB]:
+    environment = await conn[database_name][collection_name].find_one({"slug": slug, "project_id": project_id})
+    if environment:
+        # Descifrar los secretos antes de devolverlos
+        environment['secrets'] = decrypt_secrets(environment['secrets'])
+        return EnvironmentInDB(**environment)
+    return None
+
+
 # All envs are not decrypted.
 # To decrypt a env must be call by specific id
 async def get_all_environments(
