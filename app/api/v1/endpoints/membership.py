@@ -37,7 +37,7 @@ async def invite_to_organization(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para invitar a esta organización")
     # Verify if user has already an membership
-    current_membership = await get_organization_member_by_username_and_org(db, current_user.username, organization_id)
+    current_membership = await get_organization_member_by_username_and_org(db, member.username, organization_id)
     if current_membership:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="El usuario ya tiene una invitación pendiente o ya es parte de la organización")

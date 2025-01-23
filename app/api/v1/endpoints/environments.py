@@ -74,7 +74,7 @@ async def update_environment_route(
     current_user: UserInDB = Depends(
         get_current_user)
 ):
-    can_update = await can_update_environment(db, environment.project_id, current_user.id)
+    can_update = await can_update_environment(db, id, current_user.id)
     if not can_update:
         raise HTTPException(
             status_code=401, detail="Not have permissions to update environment")

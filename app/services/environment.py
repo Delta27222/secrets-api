@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import SECRET_KEY, database_name, environments_collection_name
 from ..models.dbmodel import PyObjectId
-from ..models.environment import EnvironmentCreate, EnvironmentInDB
+from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate
 
 collection_name = environments_collection_name
 
@@ -96,9 +96,9 @@ async def update_environment(conn: AsyncIOMotorClient, id: str, environment: Env
     return None
 
 
-async def update_environment(conn: AsyncIOMotorClient, id: str, environment: EnvironmentCreate) -> Optional[EnvironmentInDB]:
+async def update_environment(conn: AsyncIOMotorClient, id: str, environment: EnvironmentUpdate) -> Optional[EnvironmentInDB]:
     # Cifrar los nuevos secretos antes de actualizar
-    update_data = environment.model_dump()
+    update_data = environment.model_dump(exclude_unset=True)
     update_data['secrets'] = encrypt_secrets(update_data['secrets'])
     result = await conn[database_name][collection_name].update_one({"_id": ObjectId(id)}, {"$set": update_data})
     if result.modified_count == 1:

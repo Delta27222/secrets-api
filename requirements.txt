@@ -11,3 +11,4 @@ requests==2.32.3
 typer
 cli-oauth2
 PyGithub==2.5.0
+inquirer

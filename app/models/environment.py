@@ -22,8 +22,13 @@ class EnvironmentCreate(EnvironmentBaseForCreate, EnvironmentBase):
         default={}, description="Diccionario de secretos")
 
 
-class EnvironmentUpdate(EnvironmentBase):
+class EnvironmentUpdate(BaseModel):
     """Modelo para actualizaciones que excluye project_id"""
+    name: Optional[str] = Field(default=None,
+                                description="Nombre del entorno")
+    slug: Optional[str] = Field(default=None,
+                                description="Slug único para identificar el entorno")
+
     secrets: Dict[str, Any] = Field(
         default={}, description="Diccionario de secretos")
 
