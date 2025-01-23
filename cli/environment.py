@@ -1,5 +1,6 @@
+import json
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 import requests
 import typer
@@ -10,6 +11,7 @@ from utils import (
     _select_organization,
     _select_project,
     _show_env_variables,
+    get_environment_details,
 )
 
 cli = typer.Typer()
@@ -58,15 +60,27 @@ def get_env(
 
 @cli.command(name='update')
 def update_env(
+    env_file: Annotated[Path,
+                        typer.Option(
+                            exists=True,
+                            file_okay=True,
+                            dir_okay=False,
+                            writable=False,
+                            readable=True,
+                            resolve_path=True,
+                        ),
+                        ],
+
         # env: str,
-        env_file: Path = typer.Argument(
-            ..., help="Ruta al archivo .env con los secretos a actualizar"),
+        env_slug: Optional[str] = typer.Option(
+            None, "--env", "-e", help="Slug del Entorno del project. [dev, stg, prd, ...]"),
+
         organization_id: Optional[str] = typer.Option(
         None, "--org", "-o", help="ID de la organización"),
         project_id: Optional[str] = typer.Option(
             None, "--project", "-p", help="ID del project"),
         environment_id: Optional[str] = typer.Option(
-            None, "--env", "-e", help="Id del Entorno del project. (usar en caso de que no indique slug)"),
+            None, "--env-id", help="Id del Entorno del project. (usar en caso de que no indique slug)"),
 ):
     """
     Actualiza los secretos de un entorno específico usando el contenido de un archivo .env.
@@ -81,6 +95,9 @@ def update_env(
     if not project_id and not environment_id:
         project_id = _select_project(organization_id=organization_id)
 
+    if env_slug:
+        environment = get_environment_details(project_id, env_slug)
+        environment_id = environment['_id']
     if not environment_id:
         environment_id = _select_environment_id_by_project_id(
             project_id=project_id)
@@ -91,8 +108,6 @@ def update_env(
     # Construir el cuerpo de la petición
     body = {
         "environment": {
-            "name": "",  # Mantener el mismo nombre
-            "slug": "",  # Mantener el mismo slug
             "secrets": secrets_dict
         }
     }

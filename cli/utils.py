@@ -24,11 +24,12 @@ def _show_env_variables(project_id: str, slug: str):
                 "❌ No se encontraron variables de entorno para este proyecto y entorno.")
             return
 
-        typer.echo("Variables de entorno en formato .env:")
+        typer.echo("🔐 Variables de entorno en formato .env: \n")
         for key, value in env_vars.items():
             # Escapar el valor si contiene caracteres especiales para evitar inyección de comandos
             escaped_value = value.replace('\n', '\\n').replace('"', '\\"')
             typer.echo(f"{key}=\"{escaped_value}\"")
+        typer.echo("\n")
     except requests.RequestException as e:
         typer.echo(f"❌ Error al obtener las variables de entorno: {str(e)}")
         raise typer.Exit(code=1)
@@ -97,7 +98,7 @@ def _select_environment_id_by_project_id(project_id: str) -> Optional[str]:
             inquirer.List('environment',
                           message="🌐 Selecciona un entorno:",
                           choices=[
-                                  (env['slug'], env('_id')) for env in environments]
+                                  (env['slug'], env['_id']) for env in environments]
                           )
         ]
         answers = inquirer.prompt(options)
@@ -186,3 +187,29 @@ def _select_organization() -> Optional[str]:
     except requests.RequestException as e:
         typer.echo(f"❌ Error al obtener las organizaciones: {str(e)}")
         raise typer.Exit(code=1)
+
+
+def get_environment_details(project_id: str, slug: str):
+    """
+    Obtiene los detalles de un entorno específico de un proyecto.
+
+    :param project_id: El ID del proyecto.
+    :param slug: El slug del entorno dentro del proyecto.
+    :return: Un diccionario con los detalles del entorno o None si hay un error.
+    """
+    if not auth.authorized:
+        typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
+        raise typer.Exit(code=1)
+
+    api_url = f"http://localhost:8000/v1/projects/{project_id}/{slug}"
+    headers = {
+        "X-GitHub-Token": auth.session.token['access_token']
+    }
+
+    try:
+        response = requests.get(api_url, headers=headers)
+        response.raise_for_status()
+        return response.json()  # Devuelve los detalles del entorno como diccionario
+    except requests.RequestException as e:
+        typer.echo(f"❌ Error al obtener los detalles del entorno: {str(e)}")
+        return None

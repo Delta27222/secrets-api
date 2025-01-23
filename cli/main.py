@@ -36,8 +36,7 @@ def login():
         auth = auth.auth_server()
         authorized = auth.authorized
         if authorized:
-            typer.echo("🚀 User is authenticated")
-            typer.echo(f"🔐 Token ${auth.session.token}")
+            typer.echo("✅ User is authenticated")
         else:
             typer.echo("❌ Authentication flow failed")
 
@@ -60,7 +59,7 @@ def login():
         if response.status_code == 200:
             user_data = response.json()
             typer.echo(
-                f"🚀 Usuario autenticado: Bienvenido, {user_data.get('username', 'Usuario')}!")
+                f"✅ Usuario autenticado: Bienvenido, {user_data.get('username', 'Usuario')}!")
         else:
             typer.echo(
                 f"❌ Error de autenticación: {response.status_code} - {response.text}")
