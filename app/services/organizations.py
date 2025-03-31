@@ -19,7 +19,7 @@ from ..models.organization_member import (
     OrganizationRole,
 )
 from ..models.project import ProjectInDb
-from .users import get_user_by_username
+from .users import get_user_by_email
 
 collection_name = organizations_collection_name
 
@@ -28,7 +28,7 @@ async def create_organization_member(conn: AsyncIOMotorClient, member: Organizat
     member_dict = member.model_dump()
     result = await conn[database_name][organization_members_collection_name].insert_one(member_dict)
     new_member = await conn[database_name][organization_members_collection_name].find_one({"_id": result.inserted_id})
-    user = await get_user_by_username(conn, member.username)
+    user = await get_user_by_email(conn, member.email)
     organization = await get_organization_by_id(conn, member.organization_id)
     return OrganizationMemberInResponse(
         **new_member,
@@ -37,14 +37,14 @@ async def create_organization_member(conn: AsyncIOMotorClient, member: Organizat
     )
 
 
-async def create_organization(conn: AsyncIOMotorClient, organization: OrganizationCreate, owner_username: str) -> OrganizationInDB:
+async def create_organization(conn: AsyncIOMotorClient, organization: OrganizationCreate, owner_email: str) -> OrganizationInDB:
     doc = await conn[database_name][collection_name].insert_one(organization.model_dump())
     new_organization = await conn[database_name][collection_name].find_one({"_id": doc.inserted_id})
     organization_created = OrganizationInDB(**new_organization)
     # Create owner membership for organization
     membership_data = OrganizationMemberCreate(
         organization_id=organization_created.id,
-        username=owner_username,
+        email=owner_email,
         role=OrganizationRole.owner,
         status=MembershipStatus.accepted
     )

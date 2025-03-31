@@ -28,7 +28,7 @@ async def create_new_organization(
     current_user: UserInDB = Depends(
         get_current_user)
 ):
-    return await create_organization(db, organization, current_user.username)
+    return await create_organization(db, organization, current_user.email)
 
 
 @router.get("/organizations/{id}", response_model=OrganizationInDB)
@@ -59,7 +59,7 @@ async def get_user_projects(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Get all proejcts of user in an organization
-    projects = await get_projects_for_user_in_organization(db, current_user.username, id)
+    projects = await get_projects_for_user_in_organization(db, current_user.email, id)
     return projects
 
 

@@ -15,8 +15,8 @@ from ....services.organization_members import (
     create_invitation,
     delete_organization_member,
     get_all_organization_memberships,
-    get_all_organization_memberships_by_username,
-    get_organization_member_by_username_and_org,
+    get_all_organization_memberships_by_email,
+    get_organization_member_by_email_and_org,
     is_admin_for_organization,
 )
 
@@ -33,17 +33,17 @@ async def invite_to_organization(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Verify user has permissions to invite
-    if not is_admin_for_organization(db, current_user.username, organization_id):
+    if not is_admin_for_organization(db, current_user.email, organization_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para invitar a esta organización")
     # Verify if user has already an membership
-    current_membership = await get_organization_member_by_username_and_org(db, member.username, organization_id)
+    current_membership = await get_organization_member_by_email_and_org(db, member.email, organization_id)
     if current_membership:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="El usuario ya tiene una invitación pendiente o ya es parte de la organización")
 
     # Crear la invitación
-    new_member = await create_invitation(db, organization_id, member.username, member.role)
+    new_member = await create_invitation(db, organization_id, member.email, member.role)
     return new_member
 
 
@@ -54,7 +54,7 @@ async def accept_membership_invitation(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Verificar que el miembro que acepta la invitación es el usuario actual
-    member = await get_organization_member_by_username_and_org(db, current_user.username, member_id)
+    member = await get_organization_member_by_email_and_org(db, current_user.email, member_id)
     if not member or member.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Invitación no válida o ya aceptada")
@@ -70,7 +70,7 @@ async def get_user_memberships(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Get all membership of user
-    memberships = await get_all_organization_memberships_by_username(db, current_user.username)
+    memberships = await get_all_organization_memberships_by_email(db, current_user.email)
     return memberships
 
 
@@ -81,7 +81,7 @@ async def delete_membership(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Verificar que el usuario no es el dueño de la organización antes de eliminar la membresía
-    member = await get_organization_member_by_username_and_org(db, current_user.username, member_id)
+    member = await get_organization_member_by_email_and_org(db, current_user.email, member_id)
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Membresía no encontrada")
@@ -106,7 +106,7 @@ async def get_memberships_by_organization(
 ):
 
     # Verify permissions
-    if not await is_admin_for_organization(db, current_user.username, organization_id):
+    if not await is_admin_for_organization(db, current_user.email, organization_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para ver las membresías")
 

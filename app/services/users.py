@@ -17,6 +17,13 @@ async def get_user_by_username(conn: AsyncIOMotorClient, username: str) -> Optio
     return None
 
 
+async def get_user_by_email(conn: AsyncIOMotorClient, email: str) -> Optional[UserInDB]:
+    user = await conn[database_name][collection_name].find_one({"email": email})
+    if user:
+        return UserInDB(**user)
+    return None
+
+
 async def get_user_by_id(conn: AsyncIOMotorClient, id: str) -> Optional[UserInDB]:
     user = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
     if user:
@@ -32,6 +39,11 @@ async def get_or_create_user(conn: AsyncIOMotorClient, github_token: str) -> Use
     # Get user info from github
     try:
         github_user = github.get_user()
+        primary_email = None
+        for email in github_user.get_emails():
+            if email.primary:
+                primary_email = email.email
+                break
 
     except Exception as e:
         raise ValueError(f"Error al obtener datos del usuario de GitHub: {e}")
@@ -45,7 +57,7 @@ async def get_or_create_user(conn: AsyncIOMotorClient, github_token: str) -> Use
     else:
         # Create user in db
         new_user = UserCreate(
-            email=github_user.email,
+            email=primary_email,
             username=github_user.login,
             displayName=github_user.name if github_user.name else github_user.login
         )

@@ -20,7 +20,7 @@ from ..models.project_member import (
 from .environment import get_environment_by_id
 from .organization_members import is_admin_for_organization
 from .organizations import get_organization_by_id
-from .users import get_user_by_id, get_user_by_username
+from .users import get_user_by_id
 
 collection_name = project_members_collection_name
 
@@ -86,7 +86,7 @@ async def is_project_admin(conn: AsyncIOMotorClient, project_id: str, user_id: s
 
     user_project_member = await get_project_member_by_user_id(conn, project_id, user_id)
     user = await get_user_by_id(conn, user_id)
-    is_organization_admin = await is_admin_for_organization(conn, user.username, organization.id)
+    is_organization_admin = await is_admin_for_organization(conn, user.email, organization.id)
     return user_project_member is not None and (user_project_member.role in ["admin"] or is_organization_admin)
 
 
@@ -141,7 +141,7 @@ async def can_access_environment(conn: AsyncIOMotorClient, environment_id: str, 
             status_code=404, detail=f"User with id '{user_id}' not found")
 
     # Verify if the user is admin for organization
-    if await is_admin_for_organization(conn, user.username, project.organization_id):
+    if await is_admin_for_organization(conn, user.email, project.organization_id):
         return True
 
     # Verify if user is project member
@@ -170,7 +170,7 @@ async def can_update_environment(conn: AsyncIOMotorClient, environment_id: str, 
             status_code=404, detail=f"User with id '{user_id}' not found")
 
     # Verify if the user is admin for organization
-    if await is_admin_for_organization(conn, user.username, project.organization_id):
+    if await is_admin_for_organization(conn, user.email, project.organization_id):
         return True
 
     # Verify if user is project member

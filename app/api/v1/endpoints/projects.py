@@ -44,7 +44,7 @@ async def create_new_project(
     current_user: UserInDB = Depends(
         get_current_user)
 ):
-    if not await is_admin_for_organization(db, current_user.username, project.organization_id):
+    if not await is_admin_for_organization(db, current_user.email, project.organization_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para crear proyectos en esta organización")
 
@@ -65,7 +65,7 @@ async def get_project(
         get_current_user)
 ):
     dbproject = await get_project_by_id(db, id)
-    if not await is_admin_for_organization(db, current_user.username, dbproject.organization_id):
+    if not await is_admin_for_organization(db, current_user.email, dbproject.organization_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para obtener el proyecto {id}")
 
@@ -184,7 +184,7 @@ async def delete_project_route(
             status_code=404,
             detail=f"Project with id '{id}' not found",
         )
-    if not await is_admin_for_organization(db, current_user.username, dbproject.organization_id):
+    if not await is_admin_for_organization(db, current_user.email, dbproject.organization_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para eliminar un proyecto")
 

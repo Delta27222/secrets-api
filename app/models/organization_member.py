@@ -26,7 +26,7 @@ class MembershipStatus(str, Enum):
 class OrganizationMemberBase(RWModel):
     organization_id: str = Field(..., alias="organization_id")
     # Is the username in github
-    username: str = Field(...)
+    email: str = Field(...)
     role: OrganizationRole = Field(..., alias="role")
     status: MembershipStatus = Field(MembershipStatus.pending, alias="status")
 

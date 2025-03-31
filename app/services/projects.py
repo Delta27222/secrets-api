@@ -16,6 +16,7 @@ from ..models.project_member import ProjectMemberCreate, ProjectRole
 from .environment import create_environment
 from .organization_members import is_admin_for_organization
 from .project_members import create_project_member
+from .users import get_user_by_email
 
 collection_name = projects_collection_name
 
@@ -83,9 +84,9 @@ async def delete_project(conn: AsyncIOMotorClient, id: str) -> bool:
     return result.deleted_count == 1
 
 
-async def get_projects_for_user_in_organization(conn: AsyncIOMotorClient, username: str, organization_id: str) -> List[ProjectInDb]:
-    is_admin = await is_admin_for_organization(conn, username, organization_id)
-
+async def get_projects_for_user_in_organization(conn: AsyncIOMotorClient, email: str, organization_id: str) -> List[ProjectInDb]:
+    is_admin = await is_admin_for_organization(conn, email, organization_id)
+    user = await get_user_by_email(conn, email)
     if is_admin:
 
         projects = []
@@ -94,7 +95,7 @@ async def get_projects_for_user_in_organization(conn: AsyncIOMotorClient, userna
         return projects
     else:
         project_ids = []
-        async for member in conn[database_name][project_members_collection_name].find({"user": username, "organization_id": organization_id}):
+        async for member in conn[database_name][project_members_collection_name].find({"user": user.id, "organization_id": organization_id}):
             project_ids.append(member['project'])
 
         projects = []
