@@ -2,8 +2,9 @@ from typing import Optional
 
 import requests
 import typer
-from auth import auth
-from utils import (
+
+from .auth import auth
+from .utils import (
     _select_environment_id_by_project_id,
     _select_environment_slug_by_project_id,
     _select_organization,

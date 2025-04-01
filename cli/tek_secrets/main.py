@@ -6,15 +6,16 @@ from typing import Optional
 
 import requests
 import typer
-from auth import auth
-from environment import cli as env_commands
-from projects import cli as projects_commands
+
+from .auth import auth
+from .environment import cli as env_commands
+from .projects import cli as projects_commands
 
 APP_NAME = "tek_secrets"
 
-cli = typer.Typer()
-cli.add_typer(projects_commands, name='projects')
-cli.add_typer(env_commands, name='env')
+app = typer.Typer()
+app.add_typer(projects_commands, name='projects')
+app.add_typer(env_commands, name='env')
 
 
 def loading_animation():
@@ -25,7 +26,7 @@ def loading_animation():
     typer.echo()
 
 
-@cli.command()
+@app.command()
 def login():
     """Inicia sesión con GitHub y autentica contra la API de FastAPI."""
     try:
@@ -68,7 +69,7 @@ def login():
         typer.echo(f"❌ Error de autenticación: {e}")
 
 
-@cli.command(name='user')
+@app.command(name='user')
 def get_user_info():
     """
     Obtiene y muestra la información del usuario actual.
@@ -96,7 +97,7 @@ def get_user_info():
         typer.echo(f"❌ Error al obtener la información del usuario: {str(e)}")
 
 
-@cli.command(name='logout')
+@app.command(name='logout')
 def logout():
     """
     Cierra sesión eliminando el token de acceso guardado.
@@ -109,5 +110,5 @@ def logout():
         typer.echo(f"❌ Error al cerrar sesión: {e}")
 
 
-if __name__ == "__main__":
-    cli()
+# if __name__ == "__main__":
+#     cli()

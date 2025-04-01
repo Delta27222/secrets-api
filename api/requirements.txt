@@ -7,8 +7,4 @@ bcrypt==4.0.1
 dotenv==0.0.5
 cryptography
 requests==2.32.3
-
-typer
-cli-oauth2
-PyGithub==2.5.0
-inquirer
+starlette

@@ -3,7 +3,8 @@ from typing import Optional
 import inquirer
 import requests
 import typer
-from auth import auth
+
+from .auth import auth
 
 
 def _show_env_variables(project_id: str, slug: str):

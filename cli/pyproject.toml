@@ -1,0 +1,30 @@
+[project]
+name = "tek-secrets"
+version = "0.1.0"
+description = "Tek Secrets CLI"
+authors = [
+    {name = "Luis",email = "lespinerua@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "typer (>=0.15.2,<0.16.0)",
+    "cli-oauth2 (>=0.3.1,<0.4.0)",
+    "pygithub (==2.5.0)",
+    "inquirer (>=3.4.0,<4.0.0)",
+    "requests (==2.32.3)",
+    "dotenv (>=0.9.9,<0.10.0)",
+    "starlette (>=0.46.1,<0.47.0)"
+]
+
+
+[tool.poetry]
+packages = [{include = "tek_secrets"}]
+
+[tool.poetry.scripts]
+tek-secrets = "tek_secrets.main:app"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
