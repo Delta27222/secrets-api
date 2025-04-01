@@ -8,6 +8,7 @@ import requests
 import typer
 
 from .auth import auth
+from .config import API_URL
 from .environment import cli as env_commands
 from .projects import cli as projects_commands
 
@@ -50,7 +51,7 @@ def login():
 
         # URL del endpoint de tu API FastAPI para autenticación con GitHub
         # Ajusta esta URL según tu configuración
-        api_url = "http://localhost:8000/v1/auth/github"
+        api_url = f"{API_URL}/v1/auth/github"
         headers = {
             "X-GitHub-Token": github_token
         }
@@ -79,7 +80,7 @@ def get_user_info():
         raise typer.Exit(code=1)
 
     # Ajusta la URL según tu configuración de FastAPI
-    api_url = "http://localhost:8000/v1/auth/github"
+    api_url = f"{API_URL}/v1/auth/github"
     headers = {
         # Asumiendo que el token está en auth.session.token
         "X-GitHub-Token": auth.session.token['access_token']

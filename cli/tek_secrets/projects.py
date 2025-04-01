@@ -4,6 +4,7 @@ import requests
 import typer
 
 from .auth import auth
+from .config import API_URL
 from .utils import (
     _select_environment_id_by_project_id,
     _select_environment_slug_by_project_id,
@@ -31,7 +32,7 @@ def list_projects(
         organization_id = _select_organization()
 
     # Ajusta la URL según tu configuración de FastAPI para listar proyectos
-    api_url = f"http://localhost:8000/v1/organizations/{organization_id}/projects/me"
+    api_url = f"{API_URL}/v1/organizations/{organization_id}/projects/me"
 
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']

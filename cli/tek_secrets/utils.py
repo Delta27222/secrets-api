@@ -5,13 +5,14 @@ import requests
 import typer
 
 from .auth import auth
+from .config import API_URL
 
 
 def _show_env_variables(project_id: str, slug: str):
     """
     Obtiene y muestra las variables de entorno de un proyecto específico en formato .env en la consola.
     """
-    env_vars_api_url = f"http://localhost:8000/v1/projects/{project_id}/{slug}"
+    env_vars_api_url = f"{API_URL}/v1/projects/{project_id}/{slug}"
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']
     }
@@ -41,7 +42,7 @@ def _select_environment_slug_by_project_id(project_id: str) -> Optional[str]:
         Despliega un menu de las entornos de un proyecto especifico en el que el usuario tiene permisos
         devuelve el slug del entorno
     """
-    environments_api_url = f"http://localhost:8000/v1/projects/{project_id}/environments"
+    environments_api_url = f"{API_URL}/v1/projects/{project_id}/environments"
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']
     }
@@ -80,7 +81,7 @@ def _select_environment_id_by_project_id(project_id: str) -> Optional[str]:
         Despliega un menu de las entornos de un proyecto especifico en el que el usuario tiene permisos
         devuelve el slug del entorno
     """
-    environments_api_url = f"http://localhost:8000/v1/projects/{project_id}/environments"
+    environments_api_url = f"{API_URL}/v1/projects/{project_id}/environments"
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']
     }
@@ -119,7 +120,7 @@ def _select_project(organization_id: str) -> Optional[str]:
     Despliega un menú de los proyectos de la organización especificada a los que pertenece el usuario autenticado.
     Devuelve el ID del proyecto seleccionado.
     """
-    projects_api_url = f"http://localhost:8000/v1/organizations/{organization_id}/projects/me"
+    projects_api_url = f"{API_URL}/v1/organizations/{organization_id}/projects/me"
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']
     }
@@ -159,7 +160,7 @@ def _select_organization() -> Optional[str]:
         Despliega un menu de las organizaciones que pertenece el usuario autenticado
         devuelve el id de la organizacion seleccionada
     """
-    memberships_api_url = "http://localhost:8000/v1/organizations/memberships/me"
+    memberships_api_url = f"{API_URL}/v1/organizations/memberships/me"
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']
     }
@@ -202,7 +203,7 @@ def get_environment_details(project_id: str, slug: str):
         typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
         raise typer.Exit(code=1)
 
-    api_url = f"http://localhost:8000/v1/projects/{project_id}/{slug}"
+    api_url = f"{API_URL}/v1/projects/{project_id}/{slug}"
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']
     }

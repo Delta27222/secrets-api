@@ -6,6 +6,7 @@ import requests
 import typer
 
 from .auth import auth
+from .config import API_URL
 from .utils import (
     _select_environment_id_by_project_id,
     _select_environment_slug_by_project_id,
@@ -113,7 +114,7 @@ def update_env(
         }
     }
 
-    api_url = f"http://localhost:8000/v1/environments/{environment_id}"
+    api_url = f"{API_URL}/v1/environments/{environment_id}"
     headers = {
         "X-GitHub-Token": auth.session.token['access_token'],
         "Content-Type": "application/json"
