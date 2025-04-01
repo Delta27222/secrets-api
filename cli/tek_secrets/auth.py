@@ -6,7 +6,7 @@ from oauthcli import GitHubAuth, clean
 from starlette.datastructures import Secret
 
 load_dotenv(".env")
-# Configuración para GitHub OAuth
+# Config  GitHub OAuth
 client_id = Secret(os.getenv("CLIENT_ID"))
 client_secret = Secret(os.getenv("CLIENT_SECRET"))
 auth = GitHubAuth(

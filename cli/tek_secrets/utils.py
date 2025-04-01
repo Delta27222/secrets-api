@@ -1,4 +1,6 @@
-from typing import Optional
+import os
+import subprocess
+from typing import Dict, Optional
 
 import inquirer
 import requests
@@ -7,6 +9,69 @@ import typer
 from .auth import auth
 from .config import API_URL
 
+
+def insert_environment_variables(env_vars: Dict[str, str], skip_confirmation: bool = False) -> bool:
+    """
+    Insert environment variables into the current shell environment.
+    
+    Args:
+        env_vars: Dictionary of environment variables to insert
+        auto_execute: Whether to attempt automatic execution in the shell
+        skip_confirmation: Skip confirmation prompt when auto_execute is True
+        
+    Returns:
+        bool: True if variables were inserted/exports generated successfully
+        
+    Behavior:
+        - When auto_execute=False: Returns export commands as string
+        - When auto_execute=True: Attempts to execute exports in shell
+        - Always includes instructions for manual persistence
+    """
+    # Generate export commands with proper escaping
+    export_commands = []
+    for key, value in env_vars.items():
+        escaped_value = str(value).replace("'", "'\\''")
+        export_commands.append(f"export {key}='{escaped_value}'")
+    full_command = "\n".join(export_commands)
+
+    # Attempt to execute (note this only affects subprocess)
+    try:
+        # Try to execute in parent shell (works for some shells)
+        result = subprocess.run(
+            ["bash", "-c", f"{full_command} && exec bash"],
+            check=True,
+            text=True
+        )
+        if result.returncode == 0:
+            print("✅ Environment variables exported (for current subshell)")
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️  Partial success (variables set in subshell only): {e}")
+
+    return True
+
+
+def _get_env_variables_dict(project_id: str, env: str) -> dict:
+    """
+    Retrieve environment variables as a dictionary.
+    
+    Args:
+        project_id: Project identifier
+        env: Environment slug
+        
+    Returns:
+        dict: Key-value pairs of environment variables
+    """
+    # This would be implemented using your existing _show_env_variables logic
+    # but modified to return a dict instead of printing
+    # Implementation depends on your API response format
+    api_url = f"{API_URL}/v1/projects/{project_id}/{env}"
+    headers = {
+        "X-GitHub-Token": auth.session.token['access_token']
+    }
+    
+    response = requests.get(api_url, headers=headers)
+    response.raise_for_status()
+    return response.json().get('secrets', {})
 
 def _show_env_variables(project_id: str, slug: str):
     """

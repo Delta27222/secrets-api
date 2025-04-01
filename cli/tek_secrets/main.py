@@ -29,7 +29,18 @@ def loading_animation():
 
 @app.command()
 def login():
-    """Inicia sesión con GitHub y autentica contra la API de FastAPI."""
+    """
+    Authenticate with GitHub and authorize against Tek Secrets
+    
+    This command:
+    1. Initiates GitHub OAuth flow
+    2. Retrieves GitHub access token
+    3. Authenticates with the Tek Secrets API using the GitHub token
+    4. Displays authentication status and user information
+    
+    Raises:
+        typer.Exit: If GitHub token retrieval fails
+    """
     try:
         global auth
         typer.echo("🔐 Flujo de autenticación con GitHub")
@@ -46,7 +57,7 @@ def login():
         github_token = auth.session.token['access_token'] if auth.session.token else "Nne"
 
         if not github_token:
-            typer.echo("❌ No se obtuvo un token de GitHub")
+            typer.echo("❌ Failed to obtain GitHub token")
             raise typer.Exit(code=1)
 
         # URL del endpoint de tu API FastAPI para autenticación con GitHub
@@ -61,19 +72,26 @@ def login():
         if response.status_code == 200:
             user_data = response.json()
             typer.echo(
-                f"✅ Usuario autenticado: Bienvenido, {user_data.get('username', 'Usuario')}!")
+                f"✅ User authenticated: Welcome, {user_data.get('username', 'User')}!")
         else:
             typer.echo(
-                f"❌ Error de autenticación: {response.status_code} - {response.text}")
+                f"❌ Authentication error: {response.status_code} - {response.text}")
 
     except Exception as e:
-        typer.echo(f"❌ Error de autenticación: {e}")
+        typer.echo(f"❌ Authentication error: {e}")
 
 
 @app.command(name='user')
 def get_user_info():
     """
-    Obtiene y muestra la información del usuario actual.
+    Retrieve and display information about the currently authenticated user.
+    
+    Requires:
+        - Active authentication session (user must be logged in)
+    
+    Outputs:
+        - User information in key-value format
+        - Error message if not authenticated or request fails
     """
     if not hasattr(auth, 'session') or not auth.session.token:
         typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
@@ -91,25 +109,23 @@ def get_user_info():
         response.raise_for_status()  # Levanta una excepción si la petición no es exitosa
 
         user_data = response.json()
-        typer.echo(f"ℹ️ Información del Usuario:")
+        typer.echo(f"ℹ️ User Information:")
         for key, value in user_data.items():
             typer.echo(f"* {key}: {value}")
     except requests.RequestException as e:
-        typer.echo(f"❌ Error al obtener la información del usuario: {str(e)}")
+        typer.echo(f"❌ Error retrieving user information: {str(e)}")
 
 
 @app.command(name='logout')
 def logout():
     """
-    Cierra sesión eliminando el token de acceso guardado.
+    Terminate the current authenticated session.
+    
+    Clears the stored access token and ends the user session.
     """
     try:
-
         auth.logout()
-        typer.echo("🔒 Has cerrado sesión exitosamente.")
+        typer.echo("🔒 Successfully logged out.")
     except Exception as e:
-        typer.echo(f"❌ Error al cerrar sesión: {e}")
+        typer.echo(f"❌ Logout error: {e}")
 
-
-# if __name__ == "__main__":
-#     cli()
