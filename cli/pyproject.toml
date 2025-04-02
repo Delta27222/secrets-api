@@ -1,6 +1,6 @@
 [project]
 name = "tek-secrets"
-version = "0.1.0"
+version = "0.1.0-dev"
 description = "Tek Secrets CLI"
 authors = [
     {name = "Luis",email = "lespinerua@gmail.com"}
@@ -16,7 +16,8 @@ dependencies = [
     "requests (==2.32.3)",
     "dotenv (>=0.9.9,<0.10.0)",
     "starlette (>=0.46.1,<0.47.0)",
-    "python-dotenv (>=1.1.0,<2.0.0)"
+    "python-dotenv (>=1.1.0,<2.0.0)",
+    "oauth2-cli-auth (>=1.6.1,<2.0.0)"
 ]
 
 

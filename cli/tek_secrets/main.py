@@ -1,14 +1,21 @@
 
 import sys
 import time
+import urllib
+import webbrowser
 from itertools import cycle
 from typing import Optional
 
 import requests
 import typer
 
-from .auth import auth
-from .config import API_URL
+from .core.auth import (
+    REDIRECT_URI,
+    exchange_code_for_token,
+    get_github_auth_code,
+    run_server,
+)
+from .core.config import API_URL, CLIENT_ID, GITHUB_AUTH_URL
 from .environment import cli as env_commands
 from .projects import cli as projects_commands
 
@@ -31,34 +38,36 @@ def loading_animation():
 def login():
     """
     Authenticate with GitHub and authorize against Tek Secrets
-    
+
     This command:
     1. Initiates GitHub OAuth flow
     2. Retrieves GitHub access token
     3. Authenticates with the Tek Secrets API using the GitHub token
     4. Displays authentication status and user information
-    
+
     Raises:
         typer.Exit: If GitHub token retrieval fails
     """
     try:
-        global auth
-        typer.echo("🔐 Flujo de autenticación con GitHub")
+        typer.echo("🔐 Authentication Flow with GitHub")
         loading_animation()
 
-        auth = auth.auth_server()
-        authorized = auth.authorized
-        if authorized:
-            typer.echo("✅ User is authenticated")
-        else:
-            typer.echo("❌ Authentication flow failed")
+        auth_code = get_github_auth_code()
+        github_token = exchange_code_for_token(auth_code)
+
+        # auth = auth.auth_server()
+        # authorized = auth.authorized
+        # if authorized:
+        #     typer.echo("✅ User is authenticated")
+        # else:
+        #     typer.echo("❌ Authentication flow failed")
 
         # Suponiendo que ya tienes el token de GitHub en auth.session.token después de auth.auth_server()
-        github_token = auth.session.token['access_token'] if auth.session.token else "Nne"
+        # github_token = auth.session.token['access_token'] if auth.session.token else "Nne"
 
-        if not github_token:
-            typer.echo("❌ Failed to obtain GitHub token")
-            raise typer.Exit(code=1)
+        # if not github_token:
+        #     typer.echo("❌ Failed to obtain GitHub token")
+        #     raise typer.Exit(code=1)
 
         # URL del endpoint de tu API FastAPI para autenticación con GitHub
         # Ajusta esta URL según tu configuración
@@ -85,10 +94,10 @@ def login():
 def get_user_info():
     """
     Retrieve and display information about the currently authenticated user.
-    
+
     Requires:
         - Active authentication session (user must be logged in)
-    
+
     Outputs:
         - User information in key-value format
         - Error message if not authenticated or request fails
@@ -120,7 +129,7 @@ def get_user_info():
 def logout():
     """
     Terminate the current authenticated session.
-    
+
     Clears the stored access token and ends the user session.
     """
     try:
@@ -128,4 +137,3 @@ def logout():
         typer.echo("🔒 Successfully logged out.")
     except Exception as e:
         typer.echo(f"❌ Logout error: {e}")
-

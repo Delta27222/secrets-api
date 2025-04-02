@@ -9,9 +9,8 @@ from typing import Optional
 import requests
 import typer
 
-from .auth import auth
-from .config import API_URL
-from .utils import (
+from .core.config import API_URL
+from .core.utils import (
     _select_environment_id_by_project_id,
     _select_environment_slug_by_project_id,
     _select_organization,
@@ -28,17 +27,17 @@ def list_projects(
 ):
     """
     List all projects for the authenticated user.
-    
+
     Args:
         organization_id (Optional[str]): The organization ID to filter projects.
                                         If not provided, user will be prompted to select one.
-    
+
     Behavior:
         - Requires authenticated session
         - If no organization_id provided, prompts user to select one
         - Makes API request to fetch projects
         - Displays projects in list format
-    
+
     Raises:
         typer.Exit: If user is not authenticated or no projects found
     """
@@ -78,24 +77,23 @@ def show_project(
 ):
     """
     Display detailed information about a specific project.
-    
+
     Args:
         project_id (Optional[str]): The project ID to view details.
                                    If not provided, user will be prompted to select one.
-    
+
     Behavior:
         - Requires authenticated session
         - If no project_id provided, prompts user to select one
         - Makes API request to fetch project details
         - Displays project information
-    
+
     Raises:
         typer.Exit: If user is not authenticated
     """
     if not auth.authorized:
         typer.echo("❌ Not authenticated. Please login first.")
         raise typer.Exit(code=1)
-
 
     if not project_id:
         organization_id = _select_organization()

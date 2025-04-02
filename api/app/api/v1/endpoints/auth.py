@@ -41,12 +41,12 @@ async def get_github_token(
     except httpx.HTTPStatusError as e:
         raise HTTPException(
             status_code=e.response.status_code,
-            detail=f"Error al comunicarse con GitHub: {str(e)}"
+            detail=f"GitHub error: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error interno del servidor: {str(e)}"
+            detail=f"Server Intern error: {str(e)}"
         )
 
 

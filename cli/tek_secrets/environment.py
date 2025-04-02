@@ -6,9 +6,8 @@ from typing import Annotated, Optional
 import requests
 import typer
 
-from .auth import auth
-from .config import API_URL
-from .utils import (
+from .core.config import API_URL
+from .core.utils import (
     _get_env_variables_dict,
     _select_environment_id_by_project_id,
     _select_environment_slug_by_project_id,
@@ -25,13 +24,13 @@ cli = typer.Typer()
 def _parse_env_file(env_file_path: Path) -> dict:
     """
     Parse a .env file and convert it into a Python dictionary.
-    
+
     Args:
         env_file_path (Path): Path to the .env file to be parsed
-        
+
     Returns:
         dict: Dictionary containing key-value pairs from the .env file
-        
+
     Notes:
         - Skips lines without '=' character
         - Removes surrounding quotes from values
@@ -55,7 +54,7 @@ def get_env(
     env: Optional[str] = typer.Option(
         None, "--env", "-e", help="Project environment [dev, stg, prd, ...]"),
     output_env: Optional[Path] = typer.Option(
-        None, "--output-env", 
+        None, "--output-env",
         help="Path to save the environment variables",
         file_okay=True,
         dir_okay=False,
@@ -65,17 +64,17 @@ def get_env(
 ):
     """
     Retrieve secrets for a specific project environment.
-    
+
     Args:
         organization_id (Optional[str]): Organization identifier
         project_id (Optional[str]): Project identifier
         env (Optional[str]): Target environment slug
-        
+
     Behavior:
         - Requires authenticated session
         - If IDs not provided, interactively prompts for selection
         - Displays environment variables in readable format
-        
+
     Raises:
         typer.Exit: If user is not authenticated
     """
@@ -99,7 +98,6 @@ def get_env(
         typer.echo(f"{key}={value}")
 
     typer.echo("")
-    
 
     # Save to file if requested
     if output_env:
@@ -136,20 +134,20 @@ def update_env(
 ):
     """
     Update environment secrets using values from a .env file.
-    
+
     Args:
         env_file (Path): Path to .env file containing updated secrets
         env_slug (Optional[str]): Environment identifier slug
         organization_id (Optional[str]): Organization identifier
         project_id (Optional[str]): Project identifier
         environment_id (Optional[str]): Direct environment ID
-        
+
     Behavior:
         - Requires authenticated session
         - Parses provided .env file into key-value pairs
         - Updates specified environment with new secrets
         - Supports both interactive selection and direct ID specification
-        
+
     Raises:
         typer.Exit: If authentication fails or update operation errors occur
     """
@@ -159,7 +157,6 @@ def update_env(
 
     if not organization_id and not project_id and not environment_id:
         organization_id = _select_organization()
-
 
     if not project_id and not environment_id:
         project_id = _select_project(organization_id=organization_id)

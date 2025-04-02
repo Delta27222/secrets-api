@@ -495,6 +495,18 @@ files = [
 ]
 
 [[package]]
+name = "oauth2-cli-auth"
+version = "1.6.1"
+description = "Authenticate against OAuth2 Provider in Python CLIs"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "oauth2_cli_auth-1.6.1-py3-none-any.whl", hash = "sha256:7f5c9a2596f9d21d354ee22f4e0d60efc1fa21ce692c3810992bf81cc2a8036d"},
+    {file = "oauth2_cli_auth-1.6.1.tar.gz", hash = "sha256:6bb2d00a043a3c10e6e57573aa5bb9503251b909ca9314f4bbf19f73b08b1b89"},
+]
+
+[[package]]
 name = "oauthlib"
 version = "3.2.2"
 description = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
@@ -1034,4 +1046,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "001e486fd321622eca111c08d336c771febba7b139cb7b11a61efa52bc70ad1d"
+content-hash = "0795d5b9af1b7c2456e016e1d218161f30e9e6444ac673401cf9b8b70dcb7de8"

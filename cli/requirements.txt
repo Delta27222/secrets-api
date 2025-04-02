@@ -3,3 +3,6 @@ cli-oauth2
 PyGithub==2.5.0
 inquirer
 python-dotenv
+starlette
+oauth2-cli-auth
+requests

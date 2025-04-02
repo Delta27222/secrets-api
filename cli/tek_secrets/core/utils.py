@@ -6,22 +6,21 @@ import inquirer
 import requests
 import typer
 
-from .auth import auth
 from .config import API_URL
 
 
 def insert_environment_variables(env_vars: Dict[str, str], skip_confirmation: bool = False) -> bool:
     """
     Insert environment variables into the current shell environment.
-    
+
     Args:
         env_vars: Dictionary of environment variables to insert
         auto_execute: Whether to attempt automatic execution in the shell
         skip_confirmation: Skip confirmation prompt when auto_execute is True
-        
+
     Returns:
         bool: True if variables were inserted/exports generated successfully
-        
+
     Behavior:
         - When auto_execute=False: Returns export commands as string
         - When auto_execute=True: Attempts to execute exports in shell
@@ -53,11 +52,11 @@ def insert_environment_variables(env_vars: Dict[str, str], skip_confirmation: bo
 def _get_env_variables_dict(project_id: str, env: str) -> dict:
     """
     Retrieve environment variables as a dictionary.
-    
+
     Args:
         project_id: Project identifier
         env: Environment slug
-        
+
     Returns:
         dict: Key-value pairs of environment variables
     """
@@ -68,10 +67,11 @@ def _get_env_variables_dict(project_id: str, env: str) -> dict:
     headers = {
         "X-GitHub-Token": auth.session.token['access_token']
     }
-    
+
     response = requests.get(api_url, headers=headers)
     response.raise_for_status()
     return response.json().get('secrets', {})
+
 
 def _show_env_variables(project_id: str, slug: str):
     """
