@@ -8,8 +8,8 @@ from typing import Optional
 
 import requests
 import typer
-from core import auth
 
+from .core import auth
 from .core.config import API_URL
 from .core.utils import (
     _select_environment_id_by_project_id,
@@ -53,7 +53,7 @@ def list_projects(
     api_url = f"{API_URL}/v1/organizations/{organization_id}/projects/me"
 
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token()
     }
 
     try:
@@ -104,7 +104,7 @@ def show_project(
     api_url = f"{API_URL}/v1/projects/{project_id}"
 
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token":  auth.get_valid_token(),
     }
 
     try:

@@ -6,6 +6,7 @@ import inquirer
 import requests
 import typer
 
+from ..core import auth
 from .config import API_URL
 
 
@@ -65,7 +66,7 @@ def _get_env_variables_dict(project_id: str, env: str) -> dict:
     # Implementation depends on your API response format
     api_url = f"{API_URL}/v1/projects/{project_id}/{env}"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token(),
     }
 
     response = requests.get(api_url, headers=headers)
@@ -79,7 +80,7 @@ def _show_env_variables(project_id: str, slug: str):
     """
     env_vars_api_url = f"{API_URL}/v1/projects/{project_id}/{slug}"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token(),
     }
     try:
         response = requests.get(env_vars_api_url, headers=headers)
@@ -109,7 +110,7 @@ def _select_environment_slug_by_project_id(project_id: str) -> Optional[str]:
     """
     environments_api_url = f"{API_URL}/v1/projects/{project_id}/environments"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token(),
     }
     try:
         response = requests.get(environments_api_url, headers=headers)
@@ -148,7 +149,7 @@ def _select_environment_id_by_project_id(project_id: str) -> Optional[str]:
     """
     environments_api_url = f"{API_URL}/v1/projects/{project_id}/environments"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token(),
     }
     try:
         response = requests.get(environments_api_url, headers=headers)
@@ -187,7 +188,7 @@ def _select_project(organization_id: str) -> Optional[str]:
     """
     projects_api_url = f"{API_URL}/v1/organizations/{organization_id}/projects/me"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token(),
     }
     try:
         response = requests.get(projects_api_url, headers=headers)
@@ -227,7 +228,7 @@ def _select_organization() -> Optional[str]:
     """
     memberships_api_url = f"{API_URL}/v1/organizations/memberships/me"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token(),
     }
     try:
         response = requests.get(memberships_api_url, headers=headers)
@@ -270,7 +271,7 @@ def get_environment_details(project_id: str, slug: str):
 
     api_url = f"{API_URL}/v1/projects/{project_id}/{slug}"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token(),
     }
 
     try:

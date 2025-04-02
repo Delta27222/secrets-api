@@ -5,8 +5,8 @@ from typing import Annotated, Optional
 
 import requests
 import typer
-from core import auth
 
+from .core import auth
 from .core.config import API_URL
 from .core.utils import (
     _get_env_variables_dict,
@@ -181,7 +181,7 @@ def update_env(
 
     api_url = f"{API_URL}/v1/environments/{environment_id}"
     headers = {
-        "X-GitHub-Token": auth.session.token['access_token'],
+        "X-GitHub-Token": auth.get_valid_token(),
         "Content-Type": "application/json"
     }
 
