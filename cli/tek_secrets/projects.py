@@ -104,7 +104,7 @@ def show_project(
     api_url = f"{API_URL}/v1/projects/{project_id}"
 
     headers = {
-        "X-GitHub-Token":  auth.get_valid_token(),
+        "X-GitHub-Token": auth.get_valid_token(),
     }
 
     try:
