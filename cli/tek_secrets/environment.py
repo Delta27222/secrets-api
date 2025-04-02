@@ -5,6 +5,7 @@ from typing import Annotated, Optional
 
 import requests
 import typer
+from core import auth
 
 from .core.config import API_URL
 from .core.utils import (
@@ -78,7 +79,7 @@ def get_env(
     Raises:
         typer.Exit: If user is not authenticated
     """
-    if not auth.authorized:
+    if not auth.is_authorized():
         typer.echo("❌ Not authenticated. Please login first.")
         raise typer.Exit(code=1)
 
@@ -151,7 +152,7 @@ def update_env(
     Raises:
         typer.Exit: If authentication fails or update operation errors occur
     """
-    if not auth.authorized:
+    if not auth.is_authorized():
         typer.echo("❌ Not authenticated. Please login first.")
         raise typer.Exit(code=1)
 

@@ -264,3 +264,13 @@ def github_login_flow() -> Optional[str]:
     except Exception as e:
         print(f"Login failed: {e}")
         return None
+
+
+def get_github_token_or_start_flow() -> str:
+    authorized = is_authorized()
+    if authorized:
+        github_token = get_valid_token()
+    else:
+        auth_code = get_github_auth_code()
+        github_token = exchange_code_for_token(auth_code)
+    return github_token

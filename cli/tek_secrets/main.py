@@ -92,15 +92,14 @@ def get_user_info():
         - User information in key-value format
         - Error message if not authenticated or request fails
     """
-    if not hasattr(auth, 'session') or not auth.session.token:
+    if not auth.is_authorized():
         typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
         raise typer.Exit(code=1)
 
     # Ajusta la URL según tu configuración de FastAPI
     api_url = f"{API_URL}/v1/auth/github"
     headers = {
-        # Asumiendo que el token está en auth.session.token
-        "X-GitHub-Token": auth.session.token['access_token']
+        "X-GitHub-Token": auth.get_valid_token()
     }
 
     try:

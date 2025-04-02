@@ -8,6 +8,7 @@ from typing import Optional
 
 import requests
 import typer
+from core import auth
 
 from .core.config import API_URL
 from .core.utils import (
@@ -41,7 +42,7 @@ def list_projects(
     Raises:
         typer.Exit: If user is not authenticated or no projects found
     """
-    if not auth.authorized:
+    if not auth.is_authorized():
         typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
         raise typer.Exit(code=1)
 
@@ -91,7 +92,7 @@ def show_project(
     Raises:
         typer.Exit: If user is not authenticated
     """
-    if not auth.authorized:
+    if not auth.is_authorized():
         typer.echo("❌ Not authenticated. Please login first.")
         raise typer.Exit(code=1)
 
