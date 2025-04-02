@@ -1,9 +1,13 @@
+import json
 import os
 import urllib
 import webbrowser
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Optional
+from pathlib import Path
+from typing import Dict, Optional
 
+import keyring
 import requests
 from dotenv.main import load_dotenv
 from starlette.datastructures import Secret
@@ -14,6 +18,123 @@ from .config import API_URL, CLIENT_ID, REDIRECT_URI
 # Global variable to store the OAuth authorization code
 auth_code = None
 
+CONFIG_DIR = Path.home() / ".config" / "tek-secrets"
+TOKEN_FILE = CONFIG_DIR / "github_token.json"
+SERVICE_NAME = "tek_secrets_github"
+
+
+def ensure_config_dir() -> None:
+    """Ensure the configuration directory exists."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.touch(exist_ok=True)
+
+
+def store_token(token_data: Dict) -> None:
+    """
+    Store token securely using system keychain with file fallback.
+
+    Args:
+        token_data: Dictionary containing token information including:
+            - access_token
+            - token_type
+            - expires_in (optional)
+            - refresh_token (optional)
+            - scope
+    """
+    ensure_config_dir()
+
+    # Store sensitive data in system keychain
+    try:
+        keyring.set_password(SERVICE_NAME, "access_token",
+                             token_data["access_token"])
+        if "refresh_token" in token_data:
+            keyring.set_password(
+                SERVICE_NAME, "refresh_token", token_data["refresh_token"])
+    except Exception:
+        # Fallback to file storage if keyring fails
+        token_data["stored_at"] = datetime.utcnow().isoformat()
+        with open(TOKEN_FILE, "w") as f:
+            json.dump(token_data, f)
+        TOKEN_FILE.chmod(0o600)  # Restrict file permissions
+
+
+def load_token() -> Optional[Dict]:
+    """
+    Load stored token, checking validity.
+
+    Returns:
+        Dictionary with token data if valid token exists, None otherwise
+    """
+    try:
+        # Try to get from keychain first
+        access_token = keyring.get_password(SERVICE_NAME, "access_token")
+        refresh_token = keyring.get_password(SERVICE_NAME, "refresh_token")
+
+        if access_token:
+            return {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "source": "keyring"
+            }
+    except Exception:
+        pass
+
+    # Fallback to file storage
+    if TOKEN_FILE.exists():
+        try:
+            with open(TOKEN_FILE, "r") as f:
+                token_data = json.load(f)
+
+            # Check if token is expired (if expiration info exists)
+            if "expires_in" in token_data and "stored_at" in token_data:
+                stored_at = datetime.fromisoformat(token_data["stored_at"])
+                expires_at = stored_at + \
+                    timedelta(seconds=token_data["expires_in"])
+                if datetime.utcnow() > expires_at:
+                    return None
+
+            token_data["source"] = "file"
+            return token_data
+        except Exception:
+            return None
+
+    return None
+
+
+def get_valid_token() -> Optional[str]:
+    """
+    Get a valid access token, refreshing if necessary.
+
+    Returns:
+        Valid access token or None if no valid token available
+    """
+    token_data = load_token()
+    if not token_data:
+        return None
+
+    # Here you could add token refresh logic if your API supports it
+    # if token_needs_refresh(token_data):
+    #     return refresh_access_token(token_data["refresh_token"])
+
+    return token_data["access_token"]
+
+
+def is_authorized() -> bool:
+    token = get_valid_token()
+    return token != None
+
+
+def clear_stored_token() -> None:
+    """Remove all stored token information."""
+    try:
+        keyring.delete_password(SERVICE_NAME, "access_token")
+        keyring.delete_password(SERVICE_NAME, "refresh_token")
+    except Exception:
+        pass
+
+    if TOKEN_FILE.exists():
+        TOKEN_FILE.unlink()
+
 
 class CallbackHandler(BaseHTTPRequestHandler):
     """HTTP server handler to capture GitHub OAuth callback with authorization code."""
@@ -22,8 +143,6 @@ class CallbackHandler(BaseHTTPRequestHandler):
         """Handle GET request from GitHub OAuth redirect."""
         global auth_code
 
-        # Check if this is our OAuth callback
-        print(self.path)
         if self.path.startswith('/'):
             query = urllib.parse.urlparse(self.path).query
             params = urllib.parse.parse_qs(query)
@@ -125,6 +244,8 @@ def exchange_code_for_token(auth_code: str) -> Optional[str]:
         response.raise_for_status()  # Raises exception for 4XX/5XX responses
 
         token_data = response.json()
+        store_token(token_data)
+
         return token_data.get("access_token")
 
     except requests.exceptions.RequestException as e:
@@ -132,4 +253,22 @@ def exchange_code_for_token(auth_code: str) -> Optional[str]:
         return None
     except ValueError as e:
         print(f"Error parsing JSON response: {e}")
+        return None
+
+
+def github_login_flow() -> Optional[str]:
+    """Complete GitHub OAuth login flow returning access token."""
+    try:
+        # Step 1: Get authorization code
+        auth_code = get_github_auth_code()
+        if not auth_code:
+            print("Failed to get authorization code")
+            return None
+
+        # Step 2: Exchange code for access token
+        access_token = exchange_code_for_token(auth_code)
+        return access_token
+
+    except Exception as e:
+        print(f"Login failed: {e}")
         return None

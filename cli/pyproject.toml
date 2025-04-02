@@ -17,7 +17,8 @@ dependencies = [
     "dotenv (>=0.9.9,<0.10.0)",
     "starlette (>=0.46.1,<0.47.0)",
     "python-dotenv (>=1.1.0,<2.0.0)",
-    "oauth2-cli-auth (>=1.6.1,<2.0.0)"
+    "oauth2-cli-auth (>=1.6.1,<2.0.0)",
+    "keyring (>=25.6.0,<26.0.0)"
 ]
 
 
@@ -26,15 +27,6 @@ packages = [{include = "tek_secrets"}]
 
 [tool.poetry.scripts]
 tek-secrets = "tek_secrets.main:app"
-generate-secrets = "scripts.embed_secrets:main"  # Generador de secrets
-
-[tool.poetry.group.dev.dependencies]
-taskipy = "^1.14.1"
-
-[tool.taskipy.tasks]
-pre-build = "python scripts/embed_secrets.py"  # Genera secrets
-build = "poetry build"
-full-build = "python scripts/embed_secrets.py && poetry build"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

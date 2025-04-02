@@ -9,6 +9,7 @@ from typing import Optional
 import requests
 import typer
 
+from .core import auth
 from .core.auth import (
     REDIRECT_URI,
     exchange_code_for_token,
@@ -51,23 +52,12 @@ def login():
     try:
         typer.echo("🔐 Authentication Flow with GitHub")
         loading_animation()
-
-        auth_code = get_github_auth_code()
-        github_token = exchange_code_for_token(auth_code)
-
-        # auth = auth.auth_server()
-        # authorized = auth.authorized
-        # if authorized:
-        #     typer.echo("✅ User is authenticated")
-        # else:
-        #     typer.echo("❌ Authentication flow failed")
-
-        # Suponiendo que ya tienes el token de GitHub en auth.session.token después de auth.auth_server()
-        # github_token = auth.session.token['access_token'] if auth.session.token else "Nne"
-
-        # if not github_token:
-        #     typer.echo("❌ Failed to obtain GitHub token")
-        #     raise typer.Exit(code=1)
+        authorized = auth.is_authorized()
+        if authorized:
+            github_token = auth.get_valid_token()
+        else:
+            auth_code = get_github_auth_code()
+            github_token = exchange_code_for_token(auth_code)
 
         # URL del endpoint de tu API FastAPI para autenticación con GitHub
         # Ajusta esta URL según tu configuración
@@ -133,7 +123,7 @@ def logout():
     Clears the stored access token and ends the user session.
     """
     try:
-        auth.logout()
+        auth.clear_stored_token()
         typer.echo("🔒 Successfully logged out.")
     except Exception as e:
         typer.echo(f"❌ Logout error: {e}")
