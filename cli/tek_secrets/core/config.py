@@ -3,8 +3,6 @@ import os
 from dotenv.main import load_dotenv
 from starlette.datastructures import Secret
 
-from .._secrets import get_secret
-
 load_dotenv(".env")
 
 

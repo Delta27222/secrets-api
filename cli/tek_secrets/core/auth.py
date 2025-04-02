@@ -12,7 +12,6 @@ import requests
 from dotenv.main import load_dotenv
 from starlette.datastructures import Secret
 
-from .._secrets import get_secret
 from .config import API_URL, CLIENT_ID, REDIRECT_URI
 
 # Global variable to store the OAuth authorization code
