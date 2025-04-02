@@ -85,14 +85,6 @@ def load_token() -> Optional[Dict]:
             with open(TOKEN_FILE, "r") as f:
                 token_data = json.load(f)
 
-            # Check if token is expired (if expiration info exists)
-            if "expires_in" in token_data and "stored_at" in token_data:
-                stored_at = datetime.fromisoformat(token_data["stored_at"])
-                expires_at = stored_at + \
-                    timedelta(seconds=token_data["expires_in"])
-                if datetime.utcnow() > expires_at:
-                    return None
-
             token_data["source"] = "file"
             return token_data
         except Exception:
