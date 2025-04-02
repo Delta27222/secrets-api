@@ -13,8 +13,11 @@ load_dotenv(".env")
 MAX_CONNECTIONS_COUNT = int(os.getenv("MAX_CONNECTIONS_COUNT", 10))
 MIN_CONNECTIONS_COUNT = int(os.getenv("MIN_CONNECTIONS_COUNT", 10))
 SECRET_KEY = Secret(str(os.getenv("SECRET_KEY", "secret key for project")))
+# Github
+GITHUB_CLIENT_ID = Secret(str(os.getenv("GITHUB_CLIENT_ID", "Github Client ID")))
+GITHUB_CLIENT_SECRET = Secret(str(os.getenv("GITHUB_CLIENT_SECRET", "Github Client Secret")))
 
-PROJECT_NAME = os.getenv("PROJECT_NAME", "FastAPI example application")
+PROJECT_NAME = os.getenv("PROJECT_NAME", "Tek Secrets API")
 ALLOWED_HOSTS = CommaSeparatedStrings(os.getenv("ALLOWED_HOSTS", ""))
 MONGO_DB = os.getenv("MONGO_DB", "dev")
 MONGODB_URL = os.getenv("MONGODB_URL", "")  # deploying without docker-compose

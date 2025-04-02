@@ -7,7 +7,7 @@ authors = [
 ]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<4.0"
 dependencies = [
     "typer (>=0.15.2,<0.16.0)",
     "cli-oauth2 (>=0.3.1,<0.4.0)",
@@ -15,7 +15,8 @@ dependencies = [
     "inquirer (>=3.4.0,<4.0.0)",
     "requests (==2.32.3)",
     "dotenv (>=0.9.9,<0.10.0)",
-    "starlette (>=0.46.1,<0.47.0)"
+    "starlette (>=0.46.1,<0.47.0)",
+    "python-dotenv (>=1.1.0,<2.0.0)"
 ]
 
 
@@ -24,6 +25,15 @@ packages = [{include = "tek_secrets"}]
 
 [tool.poetry.scripts]
 tek-secrets = "tek_secrets.main:app"
+generate-secrets = "scripts.embed_secrets:main"  # Generador de secrets
+
+[tool.poetry.group.dev.dependencies]
+taskipy = "^1.14.1"
+
+[tool.taskipy.tasks]
+pre-build = "python scripts/embed_secrets.py"  # Genera secrets
+build = "poetry build"
+full-build = "python scripts/embed_secrets.py && poetry build"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

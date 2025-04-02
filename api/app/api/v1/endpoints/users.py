@@ -10,7 +10,7 @@ from ....services.users import get_or_create_user
 router = APIRouter(tags=['users'])
 
 
-@router.post("/auth/github", response_model=UserInDB)
+@router.get("/me", response_model=UserInDB)
 async def auth_github(
     github_token: str = Header(
         None, alias='X-GitHub-Token', description="El token de acceso de GitHub"),

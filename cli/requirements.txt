@@ -2,4 +2,4 @@ typer
 cli-oauth2
 PyGithub==2.5.0
 inquirer
-dotenv==0.0.5
+python-dotenv
