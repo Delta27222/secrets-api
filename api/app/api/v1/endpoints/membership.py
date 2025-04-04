@@ -55,7 +55,7 @@ async def accept_membership_invitation(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Verificar que el miembro que acepta la invitación es el usuario actual
-    member = await get_organization_member_by_email_and_org(db, current_user.email, member_id)
+    member = await get_organization_member_by_id(db, member_id)
     if not member or member.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Invitación no válida o ya aceptada")
