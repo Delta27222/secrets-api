@@ -17,6 +17,7 @@ from ....services.organization_members import (
     get_all_organization_memberships,
     get_all_organization_memberships_by_email,
     get_organization_member_by_email_and_org,
+    get_organization_member_by_id,
     is_admin_for_organization,
 )
 
@@ -81,10 +82,14 @@ async def delete_membership(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Verificar que el usuario no es el dueño de la organización antes de eliminar la membresía
-    member = await get_organization_member_by_email_and_org(db, current_user.email, member_id)
-    if not member:
+    member: Optional[OrganizationMemberInResponse] = await get_organization_member_by_id(member_id)
+    if member == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Membresía no encontrada")
+
+    if not await is_admin_for_organization(db, current_user.email, member.organization_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="No tienes permiso para eliminar membresía")
 
     if member.role == "owner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
