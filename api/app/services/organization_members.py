@@ -30,9 +30,9 @@ async def get_organization_member_by_id(conn: AsyncIOMotorClient, id: str) -> Op
     member = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
     if member:
         user = await get_user_by_email(conn, member['email'])
-        organization = await get_organization_by_id(conn, member.organization_id)
+        organization = await get_organization_by_id(conn, member['organization_id'])
         return OrganizationMemberInResponse(
-            **member.model_dump(),
+            **member,
             user=user if user else None,
             organization=organization
         )

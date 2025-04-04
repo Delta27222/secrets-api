@@ -82,7 +82,7 @@ async def delete_membership(
     current_user: UserInDB = Depends(get_current_user)
 ):
     # Verificar que el usuario no es el dueño de la organización antes de eliminar la membresía
-    member: Optional[OrganizationMemberInResponse] = await get_organization_member_by_id(member_id)
+    member: Optional[OrganizationMemberInResponse] = await get_organization_member_by_id(db, member_id)
     if member == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Membresía no encontrada")
