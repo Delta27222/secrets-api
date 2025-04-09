@@ -30,6 +30,10 @@ def decrypt_secrets(encrypted_secrets: Dict[str, str]) -> Dict[str, Any]:
     return {k: fernet.decrypt(v.encode()).decode() for k, v in encrypted_secrets.items()}
 
 
+def plain_secrets(encrypted_secrets: Dict[str, str]) -> Dict[str, Any]:
+    return {k: "********" for k, v in encrypted_secrets.items()}
+
+
 async def create_environment(conn: AsyncIOMotorClient, environment: EnvironmentCreate) -> EnvironmentInDB:
     environment_dict = environment.model_dump()
     environment_dict['secrets'] = encrypt_secrets(environment_dict['secrets'])
@@ -71,8 +75,8 @@ async def get_all_environments(
 
     environments = []
     async for env in conn[database_name][collection_name].find(query).skip(offset).limit(limit):
-        # env['secrets'] = decrypt_secrets(env['secrets'])
-        env['secrets'] = {}
+        env['secrets'] = plain_secrets(env['secrets'])
+        # env['secrets'] = {}
         environments.append(EnvironmentInDB(**env))
     return environments
 
