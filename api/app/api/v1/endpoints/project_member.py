@@ -66,12 +66,13 @@ async def update_project_member_route(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Miembro de proyecto no encontrado")
 
-    if not await is_project_admin(db, existing_member['project'], current_user.id):
+    if not await is_project_admin(db, existing_member.project, current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para actualizar este miembro de proyecto")
 
     updated_member = await update_project_member(db, member_id, project_member)
-    if updated_member is None:
+    print(updated_member)
+    if updated_member == None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No se pudo actualizar el miembro de proyecto")
     return updated_member

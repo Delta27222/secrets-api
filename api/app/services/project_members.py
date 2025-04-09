@@ -26,7 +26,7 @@ collection_name = project_members_collection_name
 
 
 async def get_project_member_by_id(conn: AsyncIOMotorClient, id: str) -> ProjectMemberInDB:
-    member = conn[database_name][project_members_collection_name].find_one({
+    member = await conn[database_name][project_members_collection_name].find_one({
         "_id": ObjectId(id)})
     if member:
         return ProjectMemberInDB(**member)
@@ -48,10 +48,9 @@ async def create_project_member(conn: AsyncIOMotorClient, project_member: Projec
 async def update_project_member(conn: AsyncIOMotorClient, member_id: str, project_member: ProjectMemberUpdate) -> Optional[ProjectMemberInDB]:
     update_data = project_member.model_dump(exclude_unset=True)
     result = await conn[database_name][collection_name].update_one({"_id": ObjectId(member_id)}, {"$set": update_data})
-    if result.modified_count == 1:
-        updated_member = await conn[database_name][collection_name].find_one({"_id": ObjectId(member_id)})
-        return ProjectMemberInDB(**updated_member)
-    return None
+
+    updated_member = await conn[database_name][collection_name].find_one({"_id": ObjectId(member_id)})
+    return ProjectMemberInDB(**updated_member)
 
 
 async def get_project_member_by_user_id(conn: AsyncIOMotorClient, project_id: str, user_id: str) -> Optional[ProjectMemberInDB]:
