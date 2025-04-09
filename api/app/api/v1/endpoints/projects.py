@@ -111,14 +111,19 @@ async def get_project_members_route(
     db: AsyncIOMotorClient = Depends(get_database),
     current_user: UserInDB = Depends(get_current_user)
 ) -> List[ProjectMemberInDB]:
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="No se encontre el proyecto indicado")
+
     member = await get_project_member_by_user_id(db, project_id, current_user.id)
-    if not member:
+    is_admin = await is_admin_for_organization(
+        db, current_user.email, project.organization_id)
+
+    if not member and not is_admin:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="No tienes permiso para ver los miembros")
 
-    # if not await is_project_admin(db, project_id, current_user.id):
-    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-    #                         detail="No tienes permiso para ver los miembros")
     members = await get_project_members(db, project_id)
     return members
 
