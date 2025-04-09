@@ -113,7 +113,7 @@ async def get_project_members_route(
 ) -> List[ProjectMemberInDB]:
     member = await get_project_member_by_user_id(db, project_id, current_user.id)
     if not member:
-        raise HTTPException(status_code=status.HTTP_401_FORBIDDEN,
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="No tienes permiso para ver los miembros")
 
     # if not await is_project_admin(db, project_id, current_user.id):
