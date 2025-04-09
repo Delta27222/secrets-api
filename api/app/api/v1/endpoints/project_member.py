@@ -20,6 +20,7 @@ from ....services.project_members import (
     is_project_admin,
     update_project_member,
 )
+from ....services.users import get_user_by_id
 
 router = APIRouter(tags=['project_members'])
 
@@ -39,7 +40,12 @@ async def create_project_member_route(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="El ID del proyecto no coincide con la ruta")
 
-    existing_member = await get_project_member_by_user_id(db, project_id, current_user.id)
+    user_to_add = await get_user_by_id(db, project_member.user)
+    if user_to_add == None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Usuario no existe")
+
+    existing_member = await get_project_member_by_user_id(db, project_id, user_to_add.id)
     if existing_member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Miembro de proyecto ya existente")

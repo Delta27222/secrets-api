@@ -56,6 +56,7 @@ async def update_project_member(conn: AsyncIOMotorClient, member_id: str, projec
 
 async def get_project_member_by_user_id(conn: AsyncIOMotorClient, project_id: str, user_id: str) -> Optional[ProjectMemberInDB]:
     member = await conn[database_name][collection_name].find_one({"project": project_id, "user": user_id})
+    print(member)
     if member:
         return ProjectMemberInDB(**member)
     return None
@@ -97,7 +98,8 @@ async def delete_project_member(conn: AsyncIOMotorClient, member_id: str) -> boo
 
 async def get_project_members(conn: AsyncIOMotorClient, project_id: str) -> List[ProjectMemberInResponse]:
     members = []
-    async for member in conn[database_name][collection_name].find({"project": project_id}):
+    data = conn[database_name][collection_name].find({"project": project_id})
+    async for member in data:
         member['user'] = await get_user_by_id(conn, member['user'])
         member['project'] = await _get_project_by_id(conn, member['project'])
         members.append(ProjectMemberInResponse(**member))
