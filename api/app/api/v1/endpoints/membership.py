@@ -110,10 +110,10 @@ async def get_memberships_by_organization(
     current_user: UserInDB = Depends(get_current_user)
 ):
 
-    # Verify permissions
-    if not await is_admin_for_organization(db, current_user.email, organization_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="No tienes permiso para ver las membresías")
+    # # Verify permissions
+    # if not await is_admin_for_organization(db, current_user.email, organization_id):
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+    #                         detail="No tienes permiso para ver las membresías")
 
     # Get memberships for organization
     memberships = await get_all_organization_memberships(db, organization_id)
