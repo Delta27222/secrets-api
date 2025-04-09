@@ -84,12 +84,12 @@ async def delete_project_member_route(
     db: AsyncIOMotorClient = Depends(get_database),
     current_user: UserInDB = Depends(get_current_user)
 ):
-    existing_member = await db[database_name][project_members_collection_name].find_one({"_id": ObjectId(member_id)})
+    existing_member = await get_project_member_by_id(db, member_id)
     if not existing_member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Miembro de proyecto no encontrado")
 
-    if not await is_project_admin(db, existing_member['project'], current_user.id):
+    if not await is_project_admin(db, existing_member.project, current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para eliminar este miembro de proyecto")
 
