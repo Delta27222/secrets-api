@@ -94,9 +94,11 @@ async def get_environments_by_project(
             status_code=404,
             detail=f"Project with id '{id}' not found",
         )
+    is_admin = await is_admin_for_organization(
+        db, current_user.email, dbproject.organization_id)
     member = await get_project_member_by_user_id(db, id, current_user.id)
-    if not member:
-        raise HTTPException(status_code=status.HTTP_401_FORBIDDEN,
+    if not member and not is_admin:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="No tienes permiso para ver los entornos de este proyecto, en esta organización")
 
     environments = await get_all_environments_by_project(db, id, limit, offset)
