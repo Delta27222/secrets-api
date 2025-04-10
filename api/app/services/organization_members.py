@@ -58,7 +58,7 @@ async def update_organization_member(conn: AsyncIOMotorClient, id: str, member: 
     if result.modified_count == 1:
         updated_member = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
         user = await get_user_by_email(conn, updated_member['email'])
-        organization = await get_organization_by_id(conn, updated_member.organization_id)
+        organization = await get_organization_by_id(conn, updated_member['organization_id'])
     return OrganizationMemberInResponse(
         **updated_member,
         user=user if user else None,

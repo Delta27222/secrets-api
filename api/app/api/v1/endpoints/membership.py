@@ -96,6 +96,9 @@ async def update_membership(
     if member.role == "owner":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="No puedes actualizar la membresía del dueño")
+    if data.role == "owner":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="No puedes actualizar la membresia a dueño")
 
     updated_member = await update_organization_member(db, member_id, data)
 
