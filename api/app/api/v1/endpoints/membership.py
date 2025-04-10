@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from ....core.auth import get_current_user
 from ....db.mongodb import AsyncIOMotorClient, get_database
@@ -19,6 +19,7 @@ from ....services.organization_members import (
     get_organization_member_by_email_and_org,
     get_organization_member_by_id,
     is_admin_for_organization,
+    update_organization_member,
 )
 
 router = APIRouter(
@@ -73,6 +74,35 @@ async def get_user_memberships(
     # Get all membership of user
     memberships = await get_all_organization_memberships_by_email(db, current_user.email)
     return memberships
+
+
+@router.put("/organizations/memberships/{member_id}")
+async def update_membership(
+    member_id: str,
+    data: OrganizationMemberUpdate = Body(...),
+    db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(get_current_user)
+):
+    # Verificar que el usuario no es el dueño de la organización antes de eliminar la membresía
+    member: Optional[OrganizationMemberInResponse] = await get_organization_member_by_id(db, member_id)
+    if member == None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Membresía no encontrada")
+
+    if not await is_admin_for_organization(db, current_user.email, member.organization_id):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="No tienes permiso para actualizar membresía")
+
+    if member.role == "owner":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="No puedes actualizar la membresía del dueño")
+
+    updated_member = await update_organization_member(db, member_id, data)
+
+    if not updated_member:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="No se pudo actualizar la membresía")
+    return updated_member
 
 
 @router.delete("/organizations/memberships/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
