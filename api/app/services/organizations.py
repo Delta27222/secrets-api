@@ -78,8 +78,28 @@ async def update_organization(conn: AsyncIOMotorClient, id: str, organization: O
 
 
 async def delete_organization(conn: AsyncIOMotorClient, id: str) -> bool:
-    result = await conn.get_database(database_name).get_collection(collection_name).delete_one({"_id": ObjectId(id)})
-    result_members = await conn.get_database(database_name).get_collection(organization_members_collection_name).delete_many({"organization_id": id})
-    result_projects = await conn.get_database(database_name).get_collection(projects_collection_name).delete_many({"organization_id": id})
-    result_project_members = await conn.get_database(database_name).get_collection(project_members_collection_name).delete_many({"organization_id": id})
+    db = conn.get_database(database_name)
+
+    projects = await db[projects_collection_name].find(
+        {"organization_id": id},
+        {"_id": 1}
+    ).to_list(length=None)
+
+    project_ids = [str(project["_id"]) for project in projects]
+
+    if project_ids:
+        await db[project_members_collection_name].delete_many(
+            {"project_id": {"$in": project_ids}}
+        )
+
+    result_projects = await db[projects_collection_name].delete_many(
+        {"organization_id": id}
+    )
+
+    result_members = await db[organization_members_collection_name].delete_many(
+        {"organization_id": id}
+    )
+
+    result = await db[collection_name].delete_one({"_id": ObjectId(id)})
+
     return result.deleted_count > 0
