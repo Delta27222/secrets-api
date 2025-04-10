@@ -79,4 +79,7 @@ async def update_organization(conn: AsyncIOMotorClient, id: str, organization: O
 
 async def delete_organization(conn: AsyncIOMotorClient, id: str) -> bool:
     result = await conn.get_database(database_name).get_collection(collection_name).delete_one({"_id": ObjectId(id)})
+    result_members = await conn.get_database(database_name).get_collection(organization_members_collection_name).delete_many({"organization_id": id})
+    result_projects = await conn.get_database(database_name).get_collection(projects_collection_name).delete_many({"organization_id": id})
+    result_project_members = await conn.get_database(database_name).get_collection(project_members_collection_name).delete_many({"organization_id": id})
     return result.deleted_count > 0
