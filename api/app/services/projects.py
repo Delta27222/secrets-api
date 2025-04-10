@@ -94,12 +94,29 @@ async def get_projects_for_user_in_organization(conn: AsyncIOMotorClient, email:
             projects.append(ProjectInDb(**project))
         return projects
     else:
-        project_ids = []
-        async for member in conn[database_name][project_members_collection_name].find({"user": user.id, "organization_id": organization_id}):
-            project_ids.append(member['project'])
+        org_projects: List[ProjectInDb] = []
+        async for project in conn[database_name][projects_collection_name].find({"organization_id": organization_id}):
+            org_projects.append(ProjectInDb(**project))
+
+        user_project_memberships_projects = await conn.get_database(database_name).get_collection(project_members_collection_name).find(
+            {
+                "user": user.id,
+                "project": {
+                    "$in": [project.id for project in org_projects]
+                }
+            },
+            {
+                "_id": 0,
+                "project": 1
+            }
+        ).to_list(length=None)
+        project_ids = [
+            data['project'] for data in user_project_memberships_projects]
 
         projects = []
+
         if project_ids:
-            async for project in conn[database_name][projects_collection_name].find({"_id": {"$in": [ObjectId(pid) for pid in project_ids]}}):
+            db_projects = await conn[database_name][projects_collection_name].find({"_id": {"$in": [ObjectId(pid) for pid in project_ids]}}).to_list(length=None)
+            for project in db_projects:
                 projects.append(ProjectInDb(**project))
         return projects
