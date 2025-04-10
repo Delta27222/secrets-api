@@ -71,12 +71,12 @@ async def update_organization(conn: AsyncIOMotorClient, id: str, organization: O
         {"_id": ObjectId(id)},
         {"$set": organization.model_dump()}
     )
-    if result.modified_count > 0:
-        updated_doc = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
-        return OrganizationInDB(**updated_doc)
-    return None
+    updated_doc = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+    return OrganizationInDB(**updated_doc)
+    # if result.modified_count > 0:
+    # return None
 
 
 async def delete_organization(conn: AsyncIOMotorClient, id: str) -> bool:
-    result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(id)})
+    result = await conn.get_database(database_name).get_collection(collection_name).delete_one({"_id": ObjectId(id)})
     return result.deleted_count > 0
