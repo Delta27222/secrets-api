@@ -9,7 +9,7 @@ from github import Github
 from ..core.config import database_name, users_collection_name
 from ..db.mongodb import AsyncIOMotorClient, get_database
 from ..models.user import UserInDB
-from ..services.users import get_user_by_username
+from ..services.users import get_or_create_user, get_user_by_username
 
 collection_name = users_collection_name
 
@@ -24,11 +24,12 @@ async def get_current_user(token: Optional[str] = Header(
     try:
         github_user = github.get_user()
         # Seek user in db
-        user = await db[database_name][collection_name].find_one({"username": github_user.login})
+        # user = await db[database_name][collection_name].find_one({"username": github_user.login})
+        user = await get_or_create_user(db, token)
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-        return UserInDB(**user)
+        return user
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
