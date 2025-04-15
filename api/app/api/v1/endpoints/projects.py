@@ -167,8 +167,9 @@ async def update_project_route(
             status_code=404,
             detail=f"Project with id '{id}' not found",
         )
+    is_org_admin = await is_admin_for_organization(db, current_user.email, dbproject.organization_id)
     is_admin = await is_project_admin(db, dbproject.id, current_user.id)
-    if not is_admin:
+    if not is_admin and not is_org_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para actualizar este proyecto")
 
