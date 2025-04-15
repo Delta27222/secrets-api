@@ -65,9 +65,13 @@ async def get_project(
         get_current_user)
 ):
     dbproject = await get_project_by_id(db, id)
-    if not await is_admin_for_organization(db, current_user.email, dbproject.organization_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="No tienes permiso para obtener el proyecto {id}")
+
+    is_admin = await is_admin_for_organization(
+        db, current_user.email, dbproject.organization_id)
+    member = await get_project_member_by_user_id(db, id, current_user.id)
+    if not member and not is_admin:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="No tienes permiso para ver los entornos de este proyecto, en esta organización")
 
     if not dbproject:
         raise HTTPException(
