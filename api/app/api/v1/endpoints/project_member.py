@@ -17,9 +17,11 @@ from ....services.project_members import (
     get_project_member_by_id,
     get_project_member_by_user_id,
     get_project_members,
+    is_admin_for_organization,
     is_project_admin,
     update_project_member,
 )
+from ....services.projects import get_project_by_id
 from ....services.users import get_user_by_id
 
 router = APIRouter(tags=['project_members'])
@@ -32,7 +34,14 @@ async def create_project_member_route(
     db: AsyncIOMotorClient = Depends(get_database),
     current_user: UserInDB = Depends(get_current_user)
 ):
-    if not await is_project_admin(db, project_id, current_user.id):
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Proyecto no encontrado")
+
+    is_admin_project = await is_project_admin(db, project_id, current_user.id)
+    is_admin = await is_admin_for_organization(db, current_user.email, project.organization_id)
+    if not is_admin_project and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No tienes permiso para añadir miembros a este proyecto")
 
