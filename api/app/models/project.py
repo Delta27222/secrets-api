@@ -10,6 +10,7 @@ from .rwmodel import RWModel
 class ProjectBase(RWModel):
     name: str
     slug: str
+    tags: dict[str, str] = {}
 
 
 class ProjectCreate(ProjectBase):

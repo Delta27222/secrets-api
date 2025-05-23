@@ -73,7 +73,6 @@ async def get_all_projects(conn: AsyncIOMotorClient) -> List[ProjectInDb]:
 
 
 async def update_project(conn: AsyncIOMotorClient, id: str, project: ProjectUpdate) -> Optional[ProjectInDb]:
-
     result = await conn[database_name][collection_name].update_one({"_id": ObjectId(id)}, {"$set": project.model_dump()})
     updated_project = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
     return ProjectInDb(**updated_project)
