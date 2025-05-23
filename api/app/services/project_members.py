@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from bson import ObjectId
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import (
@@ -45,6 +45,28 @@ async def create_project_member(conn: AsyncIOMotorClient, project_member: Projec
     return ProjectMemberInDB(**new_member)
 
 
+async def create_many_project_members(conn: AsyncIOMotorClient, project_id: str,  project_members: List[ProjectMemberCreate]) -> ProjectMemberInDB:
+    list_dict = [member.model_dump() for member in project_members]
+    user_ids = [data.user for data in project_members]
+    # user = await get_user_by_id(conn, project_member.user)
+    users = []
+    for id in user_ids:
+        user_to_add = await get_user_by_id(conn, id)
+        if user_to_add == None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Usuario no existe")
+        existing_member = await get_project_member_by_user_id(conn, project_id, user_to_add.id)
+        if existing_member:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Miembro de proyecto ya existente")
+    result = await conn.get_database(database_name).get_collection(collection_name).insert_many(
+        list_dict
+    )
+    # result = await conn[database_name][collection_name].insert_one(project_member_dict)
+    # new_member = await conn[database_name][collection_name].find_one({"_id": result.inserted_id})
+    # return ProjectMemberInDB(**new_member)
+
+
 async def update_project_member(conn: AsyncIOMotorClient, member_id: str, project_member: ProjectMemberUpdate) -> Optional[ProjectMemberInDB]:
     update_data = project_member.model_dump(exclude_unset=True)
     result = await conn[database_name][collection_name].update_one({"_id": ObjectId(member_id)}, {"$set": update_data})
@@ -55,7 +77,6 @@ async def update_project_member(conn: AsyncIOMotorClient, member_id: str, projec
 
 async def get_project_member_by_user_id(conn: AsyncIOMotorClient, project_id: str, user_id: str) -> Optional[ProjectMemberInDB]:
     member = await conn[database_name][collection_name].find_one({"project": project_id, "user": user_id})
-    print(member)
     if member:
         return ProjectMemberInDB(**member)
     return None

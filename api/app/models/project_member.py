@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,16 @@ class ProjectRole(str, Enum):
 class ProjectMemberBase(RWModel):
     project: str = Field(..., alias="project")
     user: str = Field(..., alias="user")
+    role: ProjectRole = Field(..., alias="role")
+
+    class Config:
+        from_attributes = True
+        allow_population_by_field_name = True
+
+
+class AddManyProjectMembers(RWModel):
+    project: str = Field(..., alias="project")
+    users: List[str] = Field(..., alias="user")
     role: ProjectRole = Field(..., alias="role")
 
     class Config:
