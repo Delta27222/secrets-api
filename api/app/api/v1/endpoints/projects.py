@@ -18,6 +18,7 @@ from ....models.user import UserInDB
 from ....services.environment import (
     get_all_environments_by_project,
     get_environment_by_slug,
+    get_render_info,
 )
 from ....services.organization_members import is_admin_for_organization
 from ....services.project_members import (
@@ -147,6 +148,26 @@ async def get_environment_by_slug_route(
             status_code=404, detail=f"Environment with slug '{slug}' in project {id} not found")
 
     can_read = await can_access_environment(db, environment.id, current_user.id)
+    if not can_read:
+        raise HTTPException(status_code=401, detail='User is not authorized')
+
+    return environment
+
+@router.get("/projects/{id}/{slug}/render_info", tags=["environments"])
+async def get_environment_render_info_route(
+    slug: str = Path(..., min_length=1),
+    id: str = Path(..., min_length=1),
+    db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(
+        get_current_user)
+):
+    environment = await get_render_info(db, id, slug, False)
+
+    if not environment:
+        raise HTTPException(
+            status_code=404, detail=f"Environment with slug '{slug}' in project {id} not found")
+
+    can_read = await can_access_environment(db, environment["id"], current_user.id)
     if not can_read:
         raise HTTPException(status_code=401, detail='User is not authorized')
 
