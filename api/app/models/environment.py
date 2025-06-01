@@ -11,11 +11,14 @@ class EnvironmentBaseForCreate(BaseModel):
 
 
 class EnvironmentBase(BaseModel):
-    name: str = Field(...,
-                      description="Nombre del entorno")
-    slug: str = Field(...,
-                      description="Slug único para identificar el entorno")
-
+    name: str = Field(...,description="Nombre del entorno")
+    slug: str = Field(..., description="Slug único para identificar el entorno")
+    render_server_id: Optional[str] = Field(
+        default=None, description="ID del servidor de renderizado asociado (opcional)"
+    )
+    render_token: Optional[str] = Field(
+        default=None, description="Token para el servidor de renderizado (opcional)"
+    )
 
 class EnvironmentCreate(EnvironmentBaseForCreate, EnvironmentBase):
     secrets: Dict[str, Any] = Field(
@@ -31,6 +34,15 @@ class EnvironmentUpdate(BaseModel):
 
     secrets: Dict[str, Any] = Field(
         default={}, description="Diccionario de secretos")
+
+class EnvironmentRenderUpdate(BaseModel):
+    """Modelo para actualizaciones exclusivas de render -> render_token y render_server_id"""
+    render_server_id: Optional[str] = Field(
+        default=None, description="ID del servidor de renderizado asociado (opcional)"
+    )
+    render_token: Optional[str] = Field(
+        default=None, description="Token para el servidor de renderizado (opcional)"
+    )
 
 
 class Environment(EnvironmentBase):
