@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import SECRET_KEY, database_name, environments_collection_name
 from ..models.dbmodel import PyObjectId
-from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate, EnvironmentRenderUpdate
+from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate, EnvironmentRenderUpdate, EnvironmentRenderData
 
 collection_name = environments_collection_name
 
@@ -63,7 +63,7 @@ async def get_environment_by_slug(conn: AsyncIOMotorClient, project_id: str, slu
         return EnvironmentInDB(**environment)
     return None
 
-async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str, sentSecrets: bool) -> Optional[Dict[str, str]]:
+async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str, sentSecrets: bool) -> Optional[EnvironmentRenderData]:
     """
     Retrieves the render information for a specific environment.
     """
