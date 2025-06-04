@@ -24,9 +24,9 @@ async def sync_to_render(
     if not render_data:
         raise ValueError("Render data could not be retrieved.")
 
-    service_id = render_data.get("render_server_id")
-    token = render_data.get("render_token")
-    secrets = render_data.get("secrets")
+    service_id = render_data['render_server_id']
+    token = render_data['render_token']
+    secrets = render_data['secrets']
 
     if not all([service_id, token, secrets]):
         raise ValueError("Incomplete render credentials or secrets.")
