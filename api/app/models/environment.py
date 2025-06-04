@@ -25,25 +25,23 @@ class EnvironmentCreate(EnvironmentBaseForCreate, EnvironmentBase):
         default={}, description="Diccionario de secretos")
 
 
-class EnvironmentUpdate(BaseModel):
-    """Modelo para actualizaciones que excluye project_id"""
-    name: Optional[str] = Field(default=None,
-                                description="Nombre del entorno")
-    slug: Optional[str] = Field(default=None,
-                                description="Slug único para identificar el entorno")
-
-    secrets: Dict[str, Any] = Field(
-        default={}, description="Diccionario de secretos")
-
-class EnvironmentRenderUpdate(BaseModel):
-    """Modelo para actualizaciones exclusivas de render -> render_token y render_server_id"""
+class EnvironmentRenderData(BaseModel):
     render_server_id: Optional[str] = Field(
         default=None, description="ID del servidor de renderizado asociado (opcional)"
     )
     render_token: Optional[str] = Field(
         default=None, description="Token para el servidor de renderizado (opcional)"
     )
+    secrets: Dict[str, Any] = Field(
+        default={}, description="Diccionario de secretos")
 
+class EnvironmentUpdate(EnvironmentRenderData):
+    """Modelo para actualizaciones que excluye project_id"""
+    pass
+
+class EnvironmentRenderUpdate(EnvironmentRenderData):
+    """Modelo para actualizaciones exclusivas de render -> render_token y render_server_id"""
+    pass
 
 class Environment(EnvironmentBase):
     project_id: str = Field(..., description="ID del proyecto asociado")
