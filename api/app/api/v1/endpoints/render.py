@@ -13,7 +13,7 @@ from ....services.project_members import (
 
 router = APIRouter(tags=['render'])
 
-@router.get("/sync_to_render/{project_id}/{slug}/", tags=["render"])
+@router.post("/sync/render/{project_id}/{slug}/", tags=["render"])
 async def sync_secrets_to_render(
     slug: str = Path(..., min_length=1),
     project_id: str = Path(..., min_length=1),
