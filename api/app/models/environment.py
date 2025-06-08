@@ -30,6 +30,8 @@ class EnvironmentUpdate(BaseModel):
                                 description="Nombre del entorno")
     slug: Optional[str] = Field(default=None,
                                 description="Slug único para identificar el entorno")
+    secrets: Dict[str, Any] = Field(
+        default={}, description="Diccionario de secretos")
 
 class EnvironmentRenderData(BaseModel):
     render_server_id: Optional[str] = Field(
