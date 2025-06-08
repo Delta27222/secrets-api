@@ -161,7 +161,7 @@ async def get_environment_render_info_route(
     current_user: UserInDB = Depends(
         get_current_user)
 ):
-    environment = await get_render_info(db, id, slug, False)
+    environment = await get_render_info(db, id, slug)
 
     if not environment:
         raise HTTPException(
