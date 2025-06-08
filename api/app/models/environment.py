@@ -40,8 +40,6 @@ class EnvironmentRenderData(BaseModel):
     render_token: Optional[str] = Field(
         default=None, description="Token para el servidor de renderizado (opcional)"
     )
-    secrets: Dict[str, Any] = Field(
-        default={}, description="Diccionario de secretos")
 
 class EnvironmentRenderUpdate(EnvironmentRenderData):
     """Modelo para actualizaciones exclusivas de render -> render_token y render_server_id"""
