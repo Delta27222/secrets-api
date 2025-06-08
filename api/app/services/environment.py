@@ -63,7 +63,7 @@ async def get_environment_by_slug(conn: AsyncIOMotorClient, project_id: str, slu
         return EnvironmentInDB(**environment)
     return None
 
-async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str, sentSecrets: bool) -> Optional[EnvironmentRenderData]:
+async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentRenderData]:
     """
     Retrieves the render information for a specific environment.
     """
@@ -82,8 +82,6 @@ async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str, 
             "render_server_id": decrypt_secret(environment["render_server_id"]) if environment.get("render_server_id") else None,
         }
 
-        if sentSecrets:
-            result["secrets"] = decrypt_secrets(environment["secrets"]) if environment.get("secrets") else {}
         return result
 
     except Exception as e:
@@ -153,9 +151,11 @@ async def update_environment_render_fields(
     """
 
     update_payload = render_data.model_dump(exclude_unset=True)
+    print(f"🚀 -> update_payload: {update_payload}")
 
     # Encrypt all values in the dictionary using encrypt_secrets function
     update_payload = encrypt_secrets(update_payload)
+    print(f"🚀 -> update_payload: {update_payload}")
 
     set_fields: Dict[str, Any] = {}
 
@@ -168,6 +168,7 @@ async def update_environment_render_fields(
     mongo_update_operations: Dict[str, Dict[str, Any]] = {}
     if set_fields:
         mongo_update_operations["$set"] = set_fields
+    print(f"🚀 -> set_fields: {set_fields}")
 
     # If there's nothing to update, return the existing document if it exists
     if not mongo_update_operations:
@@ -189,6 +190,46 @@ async def update_environment_render_fields(
             return EnvironmentInDB(**updated_environment)
 
     return None
+
+async def update_environment_render_fields(
+    conn: AsyncIOMotorClient,
+    id: str,
+    render_data: EnvironmentRenderUpdate
+) -> Optional[EnvironmentInDB]:
+    """
+    Updates or creates render-related fields for an environment.
+    If a field is sent as None (null in JSON), it is ignored and not updated.
+    """
+    # Prepare the update payload, excluding unset fields
+    update_payload = render_data.model_dump(exclude_unset=True)
+
+    # Encrypt all values in the dictionary using encrypt_secrets function
+    update_payload = encrypt_secrets(update_payload)
+
+    set_fields: Dict[str, Any] = {
+        k: v for k, v in update_payload.items() if v is not None
+    }
+
+    # If there are no fields to update, return the existing document
+    if not set_fields:
+        existing_env = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+        return EnvironmentInDB(**existing_env) if existing_env else None
+
+    mongo_update_operations = {"$set": set_fields}
+
+    # Actualiza solo los campos render_*, sin cifrar
+    result = await conn[database_name][collection_name].update_one(
+        {"_id": ObjectId(id)},
+        mongo_update_operations
+    )
+
+    # Update only the render_* fields, encrypting their values before saving
+    if result.modified_count == 1:
+        updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+        return EnvironmentInDB(**updated_environment) if updated_environment else None
+
+    return None
+
 
 async def delete_environment(conn: AsyncIOMotorClient, id: str) -> bool:
     result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(id)})
