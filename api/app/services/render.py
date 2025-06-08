@@ -1,4 +1,5 @@
 import httpx
+from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,6 +7,11 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from .environment import get_render_info
 
 from ..core.config import RENDER_API_URL
+
+class RenderSyncResponse(BaseModel):
+    code: str
+    yam: bool
+    status_code: int
 
 def format_render_env_vars(env_dict: Dict[str, str]) -> List[Dict[str, str]]:
     return [{"key": k, "value": v} for k, v in env_dict.items()]
@@ -47,9 +53,9 @@ async def sync_to_render(
             response = await client.put(url, json=payload, headers=headers)
             response.raise_for_status()
             return {
-              "code": "success",
-              "yam": True,
-              "status_code": response.status_code,
+                "code": "success",
+                "yam": True,
+                "status_code": response.status_code,
             }
 
         except httpx.HTTPStatusError as exc:
