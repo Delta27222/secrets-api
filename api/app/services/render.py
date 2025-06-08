@@ -1,21 +1,34 @@
+import base64
+import hashlib
 import httpx
 from pydantic import BaseModel
-from typing import Any, Dict, List, Optional
-
+from typing import Any, Dict, List, Optional #COMO PODEMOS GUARDAR TODA ESTA INFO DE ENCRIPTACION Y DEMAS EN OTRO LADO PARA NO REPERTIRLA, LA TENGO EN
+from cryptography.fernet import Fernet         #EL SERVICE SE ENVIRONMENT TAMBIEN
 from motor.motor_asyncio import AsyncIOMotorClient
+
+from ..core.config import database_name, environments_collection_name, SECRET_KEY, RENDER_API_URL
 
 from .environment import get_render_info
 
-from ..core.config import RENDER_API_URL
+from ..models.environment import EnvironmentRenderData
 
-class RenderSyncResponse(BaseModel):
-    code: str
-    yam: bool
-    status_code: int
+
+collection_name = environments_collection_name
+
+hash_object = hashlib.sha256(str(SECRET_KEY).encode())
+key = base64.urlsafe_b64encode(hash_object.digest())
+fernet = Fernet(key)
+
+def decrypt_secrets(encrypted_secrets: Dict[str, str]) -> Dict[str, Any]:
+    return {k: fernet.decrypt(v.encode()).decode() for k, v in encrypted_secrets.items()}
 
 def format_render_env_vars(env_dict: Dict[str, str]) -> List[Dict[str, str]]:
     return [{"key": k, "value": v} for k, v in env_dict.items()]
 
+class RenderSyncResponse(BaseModel): #DONDE PUDIERA COLOCAR ESTA CLASE???? para no tenerla aca
+    code: str
+    yam: bool
+    status_code: int
 
 async def sync_to_render(
     conn: AsyncIOMotorClient,
@@ -25,14 +38,22 @@ async def sync_to_render(
     """
     Sync environment variables to Render service for a given project.
     """
-    # Step 1: Retrieve render metadata and secrets
-    render_data = await get_render_info(conn, project_id, slug, sentSecrets=True)
-    if not render_data:
+    # Step 1: Get environment document from database
+    environment = await conn[database_name][collection_name].find_one({
+        "slug": slug,
+        "project_id": project_id
+    })
+    # Step 2: Retrieve render metadata
+    render_data_raw = await get_render_info(conn, project_id, slug)
+
+    if not render_data_raw:
         raise ValueError("Render data could not be retrieved.")
 
-    service_id = render_data['render_server_id']
-    token = render_data['render_token']
-    secrets = render_data['secrets']
+    render_data = EnvironmentRenderData(**render_data_raw)
+
+    service_id = render_data.render_server_id
+    token = render_data.render_token
+    secrets = decrypt_secrets(environment['secrets'])
 
     if not all([service_id, token, secrets]):
         raise ValueError("Incomplete render credentials or secrets.")
