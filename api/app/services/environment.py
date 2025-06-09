@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import SECRET_KEY, database_name, environments_collection_name
 from ..models.dbmodel import PyObjectId
-from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate
+from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate, EnvironmentRenderUpdate, EnvironmentRenderData
 
 collection_name = environments_collection_name
 
@@ -23,12 +23,16 @@ fernet = Fernet(key)
 def encrypt_secrets(secrets: Dict[str, Any]) -> Dict[str, str]:
     return {k: fernet.encrypt(str(v).encode()).decode() for k, v in secrets.items()}
 
-# Función auxiliar para descifrar un diccionario
+def encrypt_secret(value: str) -> str:
+    return fernet.encrypt(value.encode()).decode()
 
+# Función auxiliar para descifrar un diccionario
 
 def decrypt_secrets(encrypted_secrets: Dict[str, str]) -> Dict[str, Any]:
     return {k: fernet.decrypt(v.encode()).decode() for k, v in encrypted_secrets.items()}
 
+def decrypt_secret(encrypted_value: str) -> str:
+    return fernet.decrypt(encrypted_value.encode()).decode()
 
 def plain_secrets(encrypted_secrets: Dict[str, str]) -> Dict[str, Any]:
     return {k: "********" for k, v in encrypted_secrets.items()}
@@ -51,7 +55,6 @@ async def get_environment_by_id(conn: AsyncIOMotorClient, id: str) -> Optional[E
         return EnvironmentInDB(**environment)
     return None
 
-
 async def get_environment_by_slug(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentInDB]:
     environment = await conn[database_name][collection_name].find_one({"slug": slug, "project_id": project_id})
     if environment:
@@ -60,6 +63,30 @@ async def get_environment_by_slug(conn: AsyncIOMotorClient, project_id: str, slu
         return EnvironmentInDB(**environment)
     return None
 
+async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentRenderData]:
+    """
+    Retrieves the render information for a specific environment.
+    """
+    try:
+        environment = await conn[database_name][collection_name].find_one({
+            "slug": slug,
+            "project_id": project_id
+        })
+
+        if not environment:
+            return None
+
+        result = {
+            "id": str(environment["_id"]),
+            "render_token": decrypt_secret(environment["render_token"]) if environment.get("render_token") else None,
+            "render_server_id": decrypt_secret(environment["render_server_id"]) if environment.get("render_server_id") else None,
+        }
+
+        return result
+
+    except Exception as e:
+        print(f"❌ Error retrieving or decrypting render info: {e}")
+        return None
 
 # All envs are not decrypted.
 # To decrypt a env must be call by specific id
@@ -111,6 +138,45 @@ async def update_environment(conn: AsyncIOMotorClient, id: str, environment: Env
         updated_environment['secrets'] = decrypt_secrets(
             updated_environment['secrets'])
         return EnvironmentInDB(**updated_environment)
+    return None
+
+async def update_environment_render_fields(
+    conn: AsyncIOMotorClient,
+    id: str,
+    render_data: EnvironmentRenderUpdate
+) -> Optional[EnvironmentInDB]:
+    """
+    Updates or creates render-related fields for an environment.
+    If a field is sent as None (null in JSON), it is ignored and not updated.
+    """
+    # Prepare the update payload, excluding unset fields
+    update_payload = render_data.model_dump(exclude_unset=True)
+
+    # Encrypt all values in the dictionary using encrypt_secrets function
+    update_payload = encrypt_secrets(update_payload)
+
+    set_fields: Dict[str, Any] = {
+        k: v for k, v in update_payload.items() if v is not None
+    }
+
+    # If there are no fields to update, return the existing document
+    if not set_fields:
+        existing_env = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+        return EnvironmentInDB(**existing_env) if existing_env else None
+
+    mongo_update_operations = {"$set": set_fields}
+
+    # Actualiza solo los campos render_*, sin cifrar
+    result = await conn[database_name][collection_name].update_one(
+        {"_id": ObjectId(id)},
+        mongo_update_operations
+    )
+
+    # Update only the render_* fields, encrypting their values before saving
+    if result.modified_count == 1:
+        updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+        return EnvironmentInDB(**updated_environment) if updated_environment else None
+
     return None
 
 
