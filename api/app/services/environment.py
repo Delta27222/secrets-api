@@ -149,57 +149,6 @@ async def update_environment_render_fields(
     Updates or creates render-related fields for an environment.
     If a field is sent as None (null in JSON), it is ignored and not updated.
     """
-
-    update_payload = render_data.model_dump(exclude_unset=True)
-    print(f"🚀 -> update_payload: {update_payload}")
-
-    # Encrypt all values in the dictionary using encrypt_secrets function
-    update_payload = encrypt_secrets(update_payload)
-    print(f"🚀 -> update_payload: {update_payload}")
-
-    set_fields: Dict[str, Any] = {}
-
-    # Only include fields that are not None for updating
-    for field_name, value in update_payload.items():
-        if value is not None:
-            set_fields[field_name] = value
-
-    # Prepare the MongoDB update operations
-    mongo_update_operations: Dict[str, Dict[str, Any]] = {}
-    if set_fields:
-        mongo_update_operations["$set"] = set_fields
-    print(f"🚀 -> set_fields: {set_fields}")
-
-    # If there's nothing to update, return the existing document if it exists
-    if not mongo_update_operations:
-        existing_env = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
-        if existing_env:
-            return EnvironmentInDB(**existing_env)
-        return None  # No document found
-
-    # Execute the update operation on MongoDB
-    result = await conn[database_name][collection_name].update_one(
-        {"_id": ObjectId(id)},  # Match the document by its ObjectId
-        mongo_update_operations  # Apply $set operation
-    )
-
-    # If one document was modified, retrieve and return the updated version
-    if result.modified_count == 1:
-        updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
-        if updated_environment:
-            return EnvironmentInDB(**updated_environment)
-
-    return None
-
-async def update_environment_render_fields(
-    conn: AsyncIOMotorClient,
-    id: str,
-    render_data: EnvironmentRenderUpdate
-) -> Optional[EnvironmentInDB]:
-    """
-    Updates or creates render-related fields for an environment.
-    If a field is sent as None (null in JSON), it is ignored and not updated.
-    """
     # Prepare the update payload, excluding unset fields
     update_payload = render_data.model_dump(exclude_unset=True)
 
