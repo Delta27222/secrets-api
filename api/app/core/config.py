@@ -28,6 +28,8 @@ PROJECT_NAME = os.getenv("PROJECT_NAME", "Tek Secrets API")
 ALLOWED_HOSTS = CommaSeparatedStrings(os.getenv("ALLOWED_HOSTS", ""))
 MONGO_DB = os.getenv("MONGO_DB", "dev")
 MONGODB_URL = os.getenv("MONGODB_URL", "")  # deploying without docker-compose
+RENDER_API_URL = os.getenv("RENDER_API_URL", "")
+
 if not MONGODB_URL:
     MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
     MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
