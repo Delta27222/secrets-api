@@ -7,7 +7,7 @@ import requests
 import typer
 
 from ..core import auth
-from .config import API_URL
+from .config import DEV_API_URL, PROD_API_URL
 
 
 def insert_environment_variables(env_vars: Dict[str, str], skip_confirmation: bool = False) -> bool:
@@ -27,6 +27,7 @@ def insert_environment_variables(env_vars: Dict[str, str], skip_confirmation: bo
         - When auto_execute=True: Attempts to execute exports in shell
         - Always includes instructions for manual persistence
     """
+
     # Generate export commands with proper escaping
     export_commands = []
     for key, value in env_vars.items():
@@ -50,7 +51,7 @@ def insert_environment_variables(env_vars: Dict[str, str], skip_confirmation: bo
     return True
 
 
-def _get_env_variables_dict(project_id: str, env: str) -> dict:
+def _get_env_variables_dict(project_id: str, env: str, dev: Optional[bool] = False) -> dict:
     """
     Retrieve environment variables as a dictionary.
 
@@ -64,6 +65,11 @@ def _get_env_variables_dict(project_id: str, env: str) -> dict:
     # This would be implemented using your existing _show_env_variables logic
     # but modified to return a dict instead of printing
     # Implementation depends on your API response format
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     api_url = f"{API_URL}/v1/projects/{project_id}/{env}"
     headers = {
         "X-GitHub-Token": auth.get_valid_token(),
@@ -74,10 +80,15 @@ def _get_env_variables_dict(project_id: str, env: str) -> dict:
     return response.json().get('secrets', {})
 
 
-def _show_env_variables(project_id: str, slug: str):
+def _show_env_variables(project_id: str, slug: str, dev: Optional[bool] = False):
     """
     Obtiene y muestra las variables de entorno de un proyecto específico en formato .env en la consola.
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     env_vars_api_url = f"{API_URL}/v1/projects/{project_id}/{slug}"
     headers = {
         "X-GitHub-Token": auth.get_valid_token(),
@@ -103,11 +114,16 @@ def _show_env_variables(project_id: str, slug: str):
         raise typer.Exit(code=1)
 
 
-def _select_environment_slug_by_project_id(project_id: str) -> Optional[str]:
+def _select_environment_slug_by_project_id(project_id: str, dev: Optional[bool] = False) -> Optional[str]:
     """
         Despliega un menu de las entornos de un proyecto especifico en el que el usuario tiene permisos
         devuelve el slug del entorno
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     environments_api_url = f"{API_URL}/v1/projects/{project_id}/environments"
     headers = {
         "X-GitHub-Token": auth.get_valid_token(),
@@ -142,11 +158,16 @@ def _select_environment_slug_by_project_id(project_id: str) -> Optional[str]:
         raise typer.Exit(code=1)
 
 
-def _select_environment_id_by_project_id(project_id: str) -> Optional[str]:
+def _select_environment_id_by_project_id(project_id: str, dev: Optional[bool] = False) -> Optional[str]:
     """
         Despliega un menu de las entornos de un proyecto especifico en el que el usuario tiene permisos
         devuelve el slug del entorno
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     environments_api_url = f"{API_URL}/v1/projects/{project_id}/environments"
     headers = {
         "X-GitHub-Token": auth.get_valid_token(),
@@ -181,11 +202,16 @@ def _select_environment_id_by_project_id(project_id: str) -> Optional[str]:
         raise typer.Exit(code=1)
 
 
-def _select_project(organization_id: str) -> Optional[str]:
+def _select_project(organization_id: str, dev: Optional[bool] = False) -> Optional[str]:
     """
     Despliega un menú de los proyectos de la organización especificada a los que pertenece el usuario autenticado.
     Devuelve el ID del proyecto seleccionado.
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     projects_api_url = f"{API_URL}/v1/organizations/{organization_id}/projects/me"
     headers = {
         "X-GitHub-Token": auth.get_valid_token(),
@@ -221,11 +247,16 @@ def _select_project(organization_id: str) -> Optional[str]:
         raise typer.Exit(code=1)
 
 
-def _select_organization() -> Optional[str]:
+def _select_organization(dev: Optional[bool] = False) -> Optional[str]:
     """
         Despliega un menu de las organizaciones que pertenece el usuario autenticado
         devuelve el id de la organizacion seleccionada
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     memberships_api_url = f"{API_URL}/v1/organizations/memberships/me"
     headers = {
         "X-GitHub-Token": auth.get_valid_token(),
@@ -257,7 +288,7 @@ def _select_organization() -> Optional[str]:
         raise typer.Exit(code=1)
 
 
-def get_environment_details(project_id: str, slug: str):
+def get_environment_details(project_id: str, slug: str, dev: Optional[bool] = False):
     """
     Obtiene los detalles de un entorno específico de un proyecto.
 
@@ -265,6 +296,11 @@ def get_environment_details(project_id: str, slug: str):
     :param slug: El slug del entorno dentro del proyecto.
     :return: Un diccionario con los detalles del entorno o None si hay un error.
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     if not auth.authorized:
         typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
         raise typer.Exit(code=1)

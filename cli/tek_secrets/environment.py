@@ -7,7 +7,7 @@ import requests
 import typer
 
 from .core import auth
-from .core.config import API_URL
+from .core.config import DEV_API_URL, PROD_API_URL
 from .core.utils import (
     _get_env_variables_dict,
     _select_environment_id_by_project_id,
@@ -62,6 +62,8 @@ def get_env(
         writable=True,
         resolve_path=True,
     ),
+    dev: Optional[bool] = typer.Option(
+        False, "--dev", "-d", help="Use Development environment"),
 ):
     """
     Retrieve secrets for a specific project environment.
@@ -79,20 +81,27 @@ def get_env(
     Raises:
         typer.Exit: If user is not authenticated
     """
+
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     if not auth.is_authorized():
         typer.echo("❌ Not authenticated. Please login first.")
         raise typer.Exit(code=1)
 
     if not organization_id and not project_id:
-        organization_id = _select_organization()
+        organization_id = _select_organization(dev=dev)
 
     if not project_id:
-        project_id = _select_project(organization_id=organization_id)
+        project_id = _select_project(organization_id=organization_id, dev=dev)
 
     if not env:
-        env = _select_environment_slug_by_project_id(project_id=project_id)
+        env = _select_environment_slug_by_project_id(
+            project_id=project_id, dev=dev)
 
-    env_vars = _get_env_variables_dict(project_id, env)
+    env_vars = _get_env_variables_dict(project_id, env, dev=dev)
 
     typer.echo("🔍 Retrieved environment variables: \n")
     for key, value in env_vars.items():
@@ -132,6 +141,8 @@ def update_env(
             None, "--project", "-p", help="Project ID"),
         environment_id: Optional[str] = typer.Option(
             None, "--env-id", help="Environment ID (use when slug is not specified)"),
+    dev: Optional[bool] = typer.Option(
+        False, "--dev", "-d", help="Use Development environment"),
 ):
     """
     Update environment secrets using values from a .env file.
@@ -152,22 +163,27 @@ def update_env(
     Raises:
         typer.Exit: If authentication fails or update operation errors occur
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     if not auth.is_authorized():
         typer.echo("❌ Not authenticated. Please login first.")
         raise typer.Exit(code=1)
 
     if not organization_id and not project_id and not environment_id:
-        organization_id = _select_organization()
+        organization_id = _select_organization(dev=dev)
 
     if not project_id and not environment_id:
-        project_id = _select_project(organization_id=organization_id)
+        project_id = _select_project(organization_id=organization_id, dev=dev)
 
     if env_slug:
-        environment = get_environment_details(project_id, env_slug)
+        environment = get_environment_details(project_id, env_slug, dev=dev)
         environment_id = environment['_id']
     if not environment_id:
         environment_id = _select_environment_id_by_project_id(
-            project_id=project_id)
+            project_id=project_id, dev=dev)
 
     # Convertir el archivo .env a un diccionario
     secrets_dict = _parse_env_file(env_file)

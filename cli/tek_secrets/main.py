@@ -9,6 +9,8 @@ from typing import Optional
 import requests
 import typer
 
+from tek_secrets.core.config import DEV_API_URL, PROD_API_URL
+
 from .core import auth
 from .core.auth import (
     REDIRECT_URI,
@@ -16,7 +18,8 @@ from .core.auth import (
     get_github_auth_code,
     run_server,
 )
-from .core.config import API_URL, CLIENT_ID, GITHUB_AUTH_URL
+
+# from .core.config import API_URL, CLIENT_ID, GITHUB_AUTH_URL
 from .environment import cli as env_commands
 from .projects import cli as projects_commands
 
@@ -36,7 +39,10 @@ def loading_animation():
 
 
 @app.command()
-def login():
+def login(
+    dev: Optional[bool] = typer.Option(
+        False, "--dev", "-d", help="Use Development environment"),
+):
     """
     Authenticate with GitHub and authorize against Tek Secrets
 
@@ -49,6 +55,11 @@ def login():
     Raises:
         typer.Exit: If GitHub token retrieval fails
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     try:
         typer.echo("🔐 Authentication Flow with GitHub")
         loading_animation()
@@ -81,7 +92,8 @@ def login():
 
 
 @app.command(name='user')
-def get_user_info():
+def get_user_info(dev: Optional[bool] = typer.Option(
+        False, "--dev", "-d", help="Use Development environment"),):
     """
     Retrieve and display information about the currently authenticated user.
 
@@ -91,7 +103,14 @@ def get_user_info():
     Outputs:
         - User information in key-value format
         - Error message if not authenticated or request fails
+
     """
+
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     if not auth.is_authorized():
         typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
         raise typer.Exit(code=1)

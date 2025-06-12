@@ -10,7 +10,7 @@ import requests
 import typer
 
 from .core import auth
-from .core.config import API_URL
+from .core.config import DEV_API_URL, PROD_API_URL
 from .core.utils import (
     _select_environment_id_by_project_id,
     _select_environment_slug_by_project_id,
@@ -24,7 +24,9 @@ cli = typer.Typer()
 @cli.command(name='list')
 def list_projects(
     organization_id: Optional[str] = typer.Option(
-        None, "--org", "-o", help="Organization ID")
+        None, "--org", "-o", help="Organization ID"),
+    dev: Optional[bool] = typer.Option(
+        False, "--dev", "-d", help="Use Development environment"),
 ):
     """
     List all projects for the authenticated user.
@@ -42,6 +44,12 @@ def list_projects(
     Raises:
         typer.Exit: If user is not authenticated or no projects found
     """
+
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     if not auth.is_authorized():
         typer.echo("❌ No estás autenticado. Por favor, inicia sesión primero.")
         raise typer.Exit(code=1)
@@ -74,7 +82,9 @@ def list_projects(
 @cli.command(name='show')
 def show_project(
     project_id: Optional[str] = typer.Option(
-        None, "--project", "-p", help="Project ID")
+        None, "--project", "-p", help="Project ID"),
+    dev: Optional[bool] = typer.Option(
+        False, "--dev", "-d", help="Use Development environment"),
 ):
     """
     Display detailed information about a specific project.
@@ -92,6 +102,11 @@ def show_project(
     Raises:
         typer.Exit: If user is not authenticated
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
+
     if not auth.is_authorized():
         typer.echo("❌ Not authenticated. Please login first.")
         raise typer.Exit(code=1)

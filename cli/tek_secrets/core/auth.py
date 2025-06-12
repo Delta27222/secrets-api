@@ -12,7 +12,7 @@ import requests
 from dotenv.main import load_dotenv
 from starlette.datastructures import Secret
 
-from .config import API_URL, CLIENT_ID, REDIRECT_URI
+from .config import CLIENT_ID, DEV_API_URL, PROD_API_URL, REDIRECT_URI
 
 # Global variable to store the OAuth authorization code
 auth_code = None
@@ -209,7 +209,7 @@ def get_github_auth_code() -> str:
     return auth_code
 
 
-def exchange_code_for_token(auth_code: str) -> Optional[str]:
+def exchange_code_for_token(auth_code: str, dev: Optional[bool] = False) -> Optional[str]:
     """
     Exchanges GitHub authorization code for an access token by calling local API endpoint.
 
@@ -222,6 +222,10 @@ def exchange_code_for_token(auth_code: str) -> Optional[str]:
     Raises:
         requests.exceptions.RequestException: If the request fails
     """
+    if dev:
+        API_URL = DEV_API_URL
+    else:
+        API_URL = PROD_API_URL
     url = f"{API_URL}/v1/auth/github/token"
     headers = {
         "accept": "application/json"
