@@ -1,29 +1,25 @@
-[project]
-name = "tek-secrets"
-version = "0.1.4-dev"
-description = "Tek Secrets CLI"
-authors = [
-    {name = "Luis",email = "lespinerua@gmail.com"}
-]
-license = {text = "MIT"}
-readme = "README.md"
-requires-python = ">=3.11,<4.0"
-dependencies = [
-    "typer (>=0.15.2,<0.16.0)",
-    "cli-oauth2 (>=0.3.1,<0.4.0)",
-    "pygithub (==2.5.0)",
-    "inquirer (>=3.4.0,<4.0.0)",
-    "requests (==2.32.3)",
-    "dotenv (>=0.9.9,<0.10.0)",
-    "starlette (>=0.46.1,<0.47.0)",
-    "python-dotenv (>=1.1.0,<2.0.0)",
-    "oauth2-cli-auth (>=1.6.1,<2.0.0)",
-    "keyring (>=25.6.0,<26.0.0)"
-]
-
-
 [tool.poetry]
-packages = [{include = "tek_secrets"}]
+name = "tek-secrets"
+version = "0.1.8-dev"
+description = "Tek Secrets CLI"
+authors = ["Luis <lespinerua@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "tek_secrets" }]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+typer = ">=0.15.2,<0.16.0"
+cli-oauth2 = ">=0.3.1,<0.4.0"
+pygithub = "2.5.0"
+inquirer = ">=3.4.0,<4.0.0"
+requests = "2.32.3"
+dotenv = ">=0.9.9,<0.10.0"
+starlette = ">=0.46.1,<0.47.0"
+python-dotenv = ">=1.1.0,<2.0.0"
+oauth2-cli-auth = ">=1.6.1,<2.0.0"
+keyring = ">=25.6.0,<26.0.0"
+
 
 [tool.poetry.scripts]
 tek-secrets = "tek_secrets.main:app"

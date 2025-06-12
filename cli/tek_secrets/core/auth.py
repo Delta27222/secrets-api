@@ -197,7 +197,7 @@ def get_github_auth_code() -> str:
 
     # Open browser for user authentication
     webbrowser.open(auth_url)
-    print("Opened GitHub authorization in your browser...")
+    print("Opened GitHub authorization in your browser...", auth_url)
 
     # Start server to catch the callback
     print("Waiting for GitHub callback on localhost:8080...")

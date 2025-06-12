@@ -1,0 +1,11 @@
+{
+  "name": "tek-secrets-dev",
+  "version": "0.1.0",
+  "bin": {
+    "tek-secrets": "./bin/tek-secrets"
+  },
+  "scripts": {
+    "postinstall": "node -e \"const { execSync } = require('child_process'); try { execSync('python3 -m pip --version || python -m pip --version', {stdio: 'inherit'}); execSync('python3 -m pip install -e . || python -m pip install -e .', {stdio: 'inherit'}); } catch (e) { console.error('Error: Instala pip primero (python3 -m ensurepip)'); process.exit(1); }\""
+  },
+  "files": ["bin", "tek_secrets", "pyproject.toml"]
+}
