@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tek-secrets"
-version = "0.1.8-dev"
+version = "0.1.8"
 description = "Tek Secrets CLI"
 authors = ["Luis <lespinerua@gmail.com>"]
 license = "MIT"
