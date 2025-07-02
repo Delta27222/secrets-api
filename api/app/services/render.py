@@ -32,12 +32,10 @@ async def sync_to_render(
         raise ValueError("Environment not found for the given project and slug.")
 
     # Step 2: Retrieve render metadata
-    render_data_raw = await get_render_info(conn, project_id, slug)
+    render_data = await get_render_info(conn, project_id, slug)
 
-    if not render_data_raw:
+    if render_data is None:
         raise ValueError("Render data could not be retrieved.")
-
-    render_data = EnvironmentRenderData(**render_data_raw)
 
     service_id = render_data.render_server_id
     token = render_data.render_token
@@ -63,8 +61,7 @@ async def sync_to_render(
             response.raise_for_status()
             return SyncResponse(
                 code="success",
-                yam=True,
-                status_code=response.status_code,
+                environmentId=environment.id
             )
 
         except httpx.HTTPStatusError as exc:
