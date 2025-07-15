@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import SECRET_KEY, database_name, environments_collection_name
 from ..models.dbmodel import PyObjectId
-from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate, EnvironmentRenderUpdate, EnvironmentRenderData
+from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate, EnvironmentRenderUpdate, EnvironmentRenderData, EnvironmentVercelUpdate, EnvironmentVercelData
 
 collection_name = environments_collection_name
 
@@ -20,8 +20,14 @@ key = base64.urlsafe_b64encode(hash_object.digest())
 fernet = Fernet(key)
 
 
-def encrypt_secrets(secrets: Dict[str, Any]) -> Dict[str, str]:
-    return {k: fernet.encrypt(str(v).encode()).decode() for k, v in secrets.items()}
+def encrypt_secrets(data: dict) -> dict:
+    encrypted = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            encrypted[key] = fernet.encrypt(value.encode()).decode()
+        else:
+            encrypted[key] = value  # Keep as is for any other type
+    return encrypted
 
 def encrypt_secret(value: str) -> str:
     return fernet.encrypt(value.encode()).decode()
@@ -68,24 +74,46 @@ async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str) 
     Retrieves the render information for a specific environment.
     """
     try:
-        environment = await conn[database_name][collection_name].find_one({
-            "slug": slug,
-            "project_id": project_id
-        })
+        environment = await get_environment_by_slug(
+            conn, project_id, slug
+        )
 
-        if not environment:
-            return None
+        if environment is None:
+            raise ValueError("Environment not found for the given project and slug.")
 
         result = {
-            "id": str(environment["_id"]),
-            "render_token": decrypt_secret(environment["render_token"]) if environment.get("render_token") else None,
-            "render_server_id": decrypt_secret(environment["render_server_id"]) if environment.get("render_server_id") else None,
+            "environment_id": str(environment.id),
+            "render_token": decrypt_secret(environment.render_token) if environment.render_token else None,
+            "render_server_id": decrypt_secret(environment.render_server_id) if environment.render_server_id else None,
         }
-
-        return result
+        return EnvironmentRenderData(**result)
 
     except Exception as e:
         print(f"❌ Error retrieving or decrypting render info: {e}")
+        return None
+
+async def get_vercel_info(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentVercelData]:
+    """
+    Retrieves the vercel information for a specific environment.
+    """
+    try:
+        environment = await get_environment_by_slug(
+            conn, project_id, slug
+        )
+
+        if environment is None:
+            raise ValueError("Environment not found for the given project and slug.")
+
+        result = {
+            "environment_id": str(environment.id),
+            "vercel_token": decrypt_secret(environment.vercel_token) if environment.vercel_token else None,
+            "vercel_project_id": decrypt_secret(environment.vercel_project_id) if environment.vercel_project_id else None,
+            "vercel_target": environment.vercel_target if environment.vercel_target else None,
+        }
+        return EnvironmentVercelData(**result)
+
+    except Exception as e:
+        print(f"❌ Error retrieving or decrypting vercel info: {e}")
         return None
 
 # All envs are not decrypted.
@@ -135,11 +163,13 @@ async def update_environment(conn: AsyncIOMotorClient, id: str, environment: Env
     if result.modified_count == 1:
         updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
         # Descifrar los secretos para la respuesta
-        updated_environment['secrets'] = decrypt_secrets(
-            updated_environment['secrets'])
-        return EnvironmentInDB(**updated_environment)
+        if updated_environment and updated_environment.get('secrets') is not None:
+            updated_environment['secrets'] = decrypt_secrets(
+                updated_environment['secrets'])
+        return EnvironmentInDB(**updated_environment) if updated_environment else None
     return None
 
+#RENDER ACTIONS
 async def update_environment_render_fields(
     conn: AsyncIOMotorClient,
     id: str,
@@ -179,6 +209,69 @@ async def update_environment_render_fields(
 
     return None
 
+#VERCEL ACTIONS
+
+async def update_environment_vercel_fields(
+    conn: AsyncIOMotorClient,
+    id: str,
+    vercel_data: EnvironmentVercelUpdate
+) -> Optional[EnvironmentInDB]:
+    """
+    Updates or creates vercel-related fields for an environment.
+    If a field is sent as None (null in JSON), it is ignored and not updated.
+    """
+
+    update_payload = vercel_data.model_dump(exclude_unset=True)
+
+    # Encrypt all values in the dictionary using encrypt_secrets function
+    update_payload = encrypt_secrets(update_payload)
+
+    set_fields: Dict[str, Any] = {}
+
+    # Only include fields that are not None for updating
+    for field_name, value in update_payload.items():
+        if value is not None:
+            set_fields[field_name] = value
+
+    mongo_update_operations: Dict[str, Dict[str, Any]] = {}
+    if set_fields:
+        mongo_update_operations["$set"] = set_fields
+
+    # Always attempt the update if there are fields to set
+    if mongo_update_operations:
+        result = await conn[database_name][collection_name].update_one(
+            {"_id": ObjectId(id)},
+            mongo_update_operations
+        )
+
+    # Always retrieve the document after the update attempt, regardless of modified_count
+    updated_environment_doc = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+
+    if updated_environment_doc:
+        updated_environment_doc['id'] = str(updated_environment_doc['_id'])
+        return EnvironmentInDB(**updated_environment_doc)
+
+    return None
+
+
+
+async def update_environment_vercel_target(
+    conn: AsyncIOMotorClient,
+    id: str,
+    vercel_target: List[str]
+) -> bool:
+    """
+    Updates the vercel target for an environment.
+    """
+    print(f"🚀 -> 2222 vercel_target: {vercel_target}")
+
+    updated_environment = await update_environment_vercel_fields(
+        conn, id, EnvironmentVercelUpdate(vercel_target=vercel_target) # type: ignore
+    )
+    print(f"🚀 -> 33333 updated_environment: {updated_environment}")
+    if updated_environment:
+        return True
+    return False
 
 async def delete_environment(conn: AsyncIOMotorClient, id: str) -> bool:
     result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(id)})

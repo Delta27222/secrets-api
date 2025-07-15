@@ -10,17 +10,16 @@ from ....models.environment import (
     EnvironmentInDB,
     EnvironmentUpdate,
     EnvironmentRenderUpdate,
-    ManyEnvironmentsInResponse,
+    EnvironmentVercelUpdate,
 )
 from ....models.user import UserInDB
 from ....services.environment import (
     create_environment,
     delete_environment,
-    get_all_environments,
-    get_all_environments_by_project,
     get_environment_by_id,
     update_environment,
     update_environment_render_fields,
+    update_environment_vercel_fields,
 )
 from ....services.project_members import (
     can_access_environment,
@@ -87,6 +86,7 @@ async def update_environment_route(
             status_code=404, detail=f"Environment with id '{id}' not found or update failed")
     return updated_environment
 
+#RENDER ENDPOINTS
 @router.patch("/environments/{id}/render", response_model=EnvironmentInDB, tags=["environments"])
 async def update_environment_render_route(
     id: str = Path(..., min_length=1),
@@ -99,11 +99,30 @@ async def update_environment_render_route(
         raise HTTPException(
             status_code=401, detail="Not have permissions to update environment render settings")
 
-    # Llama a una nueva función de servicio o adapta la existente
     updated_environment = await update_environment_render_fields(db, id, render_data)
     if not updated_environment:
         raise HTTPException(
             status_code=404, detail=f"Environment with id '{id}' not found or render update failed")
+
+    return updated_environment
+
+#VERCEL ENDPOINT
+@router.patch("/environments/{id}/vercel", response_model=EnvironmentInDB, tags=["environments"])
+async def update_environment_vercel_route(
+    id: str = Path(..., min_length=1),
+    vercel_data: EnvironmentVercelUpdate = Body(..., embed=True),
+    db: AsyncIOMotorClient = Depends(get_database),
+    current_user: UserInDB = Depends(get_current_user)
+):
+    can_update = await can_update_environment(db, id, current_user.id)
+    if not can_update:
+        raise HTTPException(
+            status_code=401, detail="Not have permissions to update environment vercel settings")
+
+    updated_environment = await update_environment_vercel_fields(db, id, vercel_data)
+    if not updated_environment:
+        raise HTTPException(
+            status_code=404, detail=f"Environment with id '{id}' not found or vercel update failed")
 
     return updated_environment
 
