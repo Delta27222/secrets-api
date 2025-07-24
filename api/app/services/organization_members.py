@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from bson import ObjectId
 from fastapi import HTTPException
+import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import database_name, organization_members_collection_name
@@ -142,9 +143,25 @@ async def get_organization_member_with_details(conn: AsyncIOMotorClient, member_
 
 async def get_all_organization_memberships(conn: AsyncIOMotorClient, organization_id: str) -> List[OrganizationMemberInResponse]:
     memberships = []
-    async for member in conn[database_name][collection_name].find({"organization_id": organization_id}):
-        user = await get_user_by_email(conn, member['email'])
-        organization = await get_organization_by_id(conn, organization_id)
+    # Obtención de los miembros de la organización en una sola consulta
+    members_cursor = conn[database_name][collection_name].find({"organization_id": organization_id})
+    members = await members_cursor.to_list(length=None)  # Convertimos el cursor en una lista de miembros
+
+    # Creamos una lista de tareas para obtener usuarios y organizaciones concurrentemente
+    user_tasks = []
+    organization_task = get_organization_by_id(conn, organization_id)  # Solo una consulta a la organización
+
+    for member in members:
+        user_tasks.append(get_user_by_email(conn, member['email']))
+
+    # Ejecutamos todas las tareas concurrentemente
+    users = await asyncio.gather(*user_tasks)  # Esperamos todas las tareas de usuarios
+
+    # Obtenemos la organización (solo se necesita una vez)
+    organization = await organization_task
+
+    # Procesamos los miembros
+    for member, user in zip(members, users):
         memberships.append(
             OrganizationMemberInResponse(
                 **member,
