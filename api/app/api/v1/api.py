@@ -9,6 +9,7 @@ from .endpoints.projects import router as projects_router
 from .endpoints.users import router as users_router
 from .endpoints.render import router as render_router
 from .endpoints.vercel import router as vercel_router
+from .endpoints.logs import router as logs_router
 
 router = APIRouter()
 router.include_router(auth_router)
@@ -20,3 +21,4 @@ router.include_router(memberships_router)
 router.include_router(project_member_router)
 router.include_router(render_router)
 router.include_router(vercel_router)
+router.include_router(logs_router)
