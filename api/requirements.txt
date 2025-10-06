@@ -11,3 +11,10 @@ starlette
 PyGithub==2.5.0
 python-dotenv
 httpx
+asyncio
+boto3
+datetime
+
+questdb
+sqlalchemy>=2.0.0
+asyncpg>=0.29.0
