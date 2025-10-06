@@ -27,8 +27,22 @@ GITHUB_CLIENT_SECRET_APP = Secret(
 PROJECT_NAME = os.getenv("PROJECT_NAME", "Tek Secrets API")
 ALLOWED_HOSTS = CommaSeparatedStrings(os.getenv("ALLOWED_HOSTS", ""))
 MONGO_DB = os.getenv("MONGO_DB", "dev")
-MONGODB_URL = os.getenv("MONGODB_URL", "")  # deploying without docker-compose
-RENDER_API_URL = os.getenv("RENDER_API_URL", "")
+MONGODB_URL = os.getenv("MONGODB_URL", "MongoDB URL")  # deploying without docker-compose
+
+# Deployments
+RENDER_API_URL = os.getenv("RENDER_API_URL", " Render API URL")
+VERCEL_API_URL = os.getenv("VERCEL_API_URL", " Vercel API URL")
+
+# AWS SQS
+SQS_QUEUE_URL = os.getenv("SQS_QUEUE_URL", " SQS Queue URL")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", " AWS Access Key ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", " AWS Secret Access Key")
+AWS_REGION_NAME = os.getenv("AWS_REGION_NAME", "AWS Region Name")
+
+# QuestDB Information Configuration for Logs
+EC2_INSTANCE_IP = os.getenv("EC2_INSTANCE_IP", "EC2 Instance IP")
+EC2_INSTANCE_PORT = int(os.getenv("EC2_INSTANCE_PORT", 9000))
+EC2_INSTANCE_URL = os.getenv("EC2_INSTANCE_DB", f'http://{EC2_INSTANCE_IP}:{EC2_INSTANCE_PORT}')
 
 if not MONGODB_URL:
     MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
