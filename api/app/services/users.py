@@ -5,7 +5,7 @@ from github import Github
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorCollection
 
 from ..core.config import database_name, users_collection_name
-from ..models.user import UserCreate, UserInDB
+from ..models.user import UserCreate, UserInDB, UserMinimal
 
 collection_name = users_collection_name
 
@@ -69,3 +69,11 @@ async def get_or_create_user(conn: AsyncIOMotorClient, github_token: str) -> Use
 
         # Return user created
         return UserInDB(**inserted_user)
+
+async def get_all_users_minimal(conn: AsyncIOMotorClient) -> List[UserMinimal]:
+    users: List[UserMinimal] = []
+    projection = {"_id": 1, "displayName": 1, "email": 1}
+    cursor = conn[database_name][collection_name].find({}, projection)
+    async for user in cursor:
+        users.append(UserMinimal(**user))
+    return users
