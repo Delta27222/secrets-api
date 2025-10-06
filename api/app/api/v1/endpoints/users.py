@@ -4,8 +4,8 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Query
 
 from ....core.utils import create_aliased_response
 from ....db.mongodb import AsyncIOMotorClient, get_database
-from ....models.user import UserInDB
-from ....services.users import get_or_create_user
+from ....models.user import UserInDB, UserMinimal
+from ....services.users import get_or_create_user, get_all_users_minimal
 
 router = APIRouter(tags=['users'])
 
@@ -28,3 +28,11 @@ async def auth_github(
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Authentication failed: {str(e)}")
+
+
+
+@router.get("/users/minimal", response_model=List[UserMinimal], summary="List minimal users", description="List users with only id, displayName and email", tags=["users"])
+async def list_users_minimal(
+    db: AsyncIOMotorClient = Depends(get_database)
+):
+    return await get_all_users_minimal(db)
