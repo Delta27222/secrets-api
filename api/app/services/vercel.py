@@ -1,13 +1,13 @@
 import httpx
 from typing import Any, Dict, List, Optional
-from cryptography.fernet import Fernet
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..core.config import database_name, environments_collection_name, SECRET_KEY, VERCEL_API_URL
-
-from .environment import get_vercel_info, get_environment_by_slug
+from app.models.environment import EnvironmentInDB, EnvironmentVercelData
 
 from ..models.sync import SyncResponse, MismatchSecrets
+from .environment import get_vercel_info, get_environment_by_slug
+from ..core.config import environments_collection_name, VERCEL_API_URL
+from ..core.logging import create_service_logger
 
 
 collection_name = environments_collection_name
@@ -94,6 +94,26 @@ async def sync_to_vercel(
     if vercel_data is None:
         raise ValueError("Vercel data could not be retrieved.")
 
+    return await _sync_to_vercel(
+        target_id=environment.id,
+        environment=environment,
+        vercel_data=vercel_data,
+        target_name=target_name,
+        remove_missing=remove_missing
+    )
+
+@create_service_logger("vercel", "sync_to_vercel", "environment")
+async def _sync_to_vercel(
+    target_id: str,
+    environment: EnvironmentInDB,
+    vercel_data: EnvironmentVercelData,
+    target_name: str,
+    remove_missing: bool
+) -> Optional[SyncResponse]:
+    """
+    Internal function to sync environment variables to Vercel service.
+    This is a placeholder for the actual implementation.
+    """
     proj_id = vercel_data.vercel_project_id
     token = vercel_data.vercel_token
     targets = [target_name]

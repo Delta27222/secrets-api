@@ -1,20 +1,18 @@
-from typing import Dict, List, Optional
-
 import httpx
+from typing import Dict, List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..core.config import environments_collection_name, RENDER_API_URL
+from ..models.environment import EnvironmentInDB, EnvironmentRenderData
 
-from ..models.environment import EnvironmentRenderData
 from ..models.sync import SyncResponse
-
+from ..core.logging import create_service_logger
 from .environment import get_render_info, get_environment_by_slug
+from ..core.config import environments_collection_name, RENDER_API_URL
 
 collection_name = environments_collection_name
 
 def format_render_env_vars(env_dict: Dict[str, str]) -> List[Dict[str, str]]:
     return [{"key": k, "value": v} for k, v in env_dict.items()]
-
 
 async def sync_to_render(
     conn: AsyncIOMotorClient,
@@ -36,6 +34,24 @@ async def sync_to_render(
 
     if render_data is None:
         raise ValueError("Render data could not be retrieved.")
+
+    # Step 3: Call internal function to sync to Render
+    return await _sync_to_render(
+        target_id=environment.id,
+        environment=environment,
+        render_data=render_data
+    )
+
+@create_service_logger("render", "sync_to_render", "environment")
+async def _sync_to_render(
+    target_id: str,
+    environment: EnvironmentInDB,
+    render_data: EnvironmentRenderData,
+    ) -> Optional[SyncResponse]:
+    """
+    Internal function to sync environment variables to Render service.
+    This is a placeholder for the actual implementation.
+    """
 
     service_id = render_data.render_server_id
     token = render_data.render_token

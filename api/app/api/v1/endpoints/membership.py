@@ -2,6 +2,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
+from app.core.logging import create_service_logger
+
 from ....core.auth import get_current_user
 from ....db.mongodb import AsyncIOMotorClient, get_database
 from ....models.organization_member import (
@@ -43,10 +45,11 @@ async def invite_to_organization(
     if current_membership:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="El usuario ya tiene una invitación pendiente o ya es parte de la organización")
+    return await _create_invitation(current_user.id, db, organization_id, member.email, member.role)
 
-    # Crear la invitación
-    new_member = await create_invitation(db, organization_id, member.email, member.role)
-    return new_member
+@create_service_logger("membership", "create_invitation", "organization")
+async def _create_invitation(target_id: str, db: AsyncIOMotorClient, organization_id: str, email: str, role: str) -> OrganizationMemberInResponse:
+    return await create_invitation(db, organization_id, email, role)
 
 
 @router.post("/organizations/memberships/{member_id}/accept", response_model=OrganizationMemberInResponse)
@@ -129,12 +132,15 @@ async def delete_membership(
                             detail="No puedes eliminar la membresía del dueño")
 
     # Eliminar la membresía
-    deleted = await delete_organization_member(db, member_id)
+    deleted = await _delete_organization_member(current_user.id, db, member_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="No se pudo eliminar la membresía")
     return None
 
+@create_service_logger("membership", "delete_organization_member", "organization")
+async def _delete_organization_member(target_id: str, db: AsyncIOMotorClient, member_id: str) -> bool:
+    return await delete_organization_member(db, member_id)
 
 @router.get("/organizations/{organization_id}/memberships", response_model=List[OrganizationMemberInResponse])
 async def get_memberships_by_organization(

@@ -6,9 +6,10 @@ from bson import ObjectId
 from cryptography.fernet import Fernet
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from ..core.config import SECRET_KEY, database_name, environments_collection_name
-from ..models.dbmodel import PyObjectId
+from app.core.logging import create_service_logger
+
 from ..models.environment import EnvironmentCreate, EnvironmentInDB, EnvironmentUpdate, EnvironmentRenderUpdate, EnvironmentRenderData, EnvironmentVercelUpdate, EnvironmentVercelData
+from ..core.config import SECRET_KEY, database_name, environments_collection_name
 
 collection_name = environments_collection_name
 
@@ -43,7 +44,6 @@ def decrypt_secret(encrypted_value: str) -> str:
 def plain_secrets(encrypted_secrets: Dict[str, str]) -> Dict[str, Any]:
     return {k: "********" for k, v in encrypted_secrets.items()}
 
-
 async def create_environment(conn: AsyncIOMotorClient, environment: EnvironmentCreate) -> EnvironmentInDB:
     environment_dict = environment.model_dump()
     environment_dict['secrets'] = encrypt_secrets(environment_dict['secrets'])
@@ -61,13 +61,26 @@ async def get_environment_by_id(conn: AsyncIOMotorClient, id: str) -> Optional[E
         return EnvironmentInDB(**environment)
     return None
 
+# async def get_environment_by_slug(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentInDB]:
+#     environment = await conn[database_name][collection_name].find_one({"slug": slug, "project_id": project_id})
+#     if environment:
+#         # Descifrar los secretos antes de devolverlos
+#         environment['secrets'] = decrypt_secrets(environment['secrets'])
+#         return EnvironmentInDB(**environment)
+#     return None
+
+
 async def get_environment_by_slug(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentInDB]:
     environment = await conn[database_name][collection_name].find_one({"slug": slug, "project_id": project_id})
     if environment:
-        # Descifrar los secretos antes de devolverlos
-        environment['secrets'] = decrypt_secrets(environment['secrets'])
-        return EnvironmentInDB(**environment)
+        return await _get_environment_by_slug(environment['_id'], environment)
     return None
+
+@create_service_logger("environment", "get_secrets_by_environment", "environment")
+async def _get_environment_by_slug(target_id: str, environment: EnvironmentInDB) -> Optional[EnvironmentInDB]:
+    environment['secrets'] = decrypt_secrets(environment['secrets'])
+    return EnvironmentInDB(**environment)
+
 
 async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentRenderData]:
     """
@@ -147,21 +160,21 @@ async def get_all_environments_by_project(
     return await get_all_environments(conn, project_id, limit, offset)
 
 
-async def update_environment(conn: AsyncIOMotorClient, id: str, environment: EnvironmentCreate) -> Optional[EnvironmentInDB]:
-    result = await conn[database_name][collection_name].update_one({"_id": ObjectId(id)}, {"$set": environment.model_dump()})
-    if result.modified_count == 1:
-        updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
-        return EnvironmentInDB(**updated_environment)
-    return None
+# async def update_environment(conn: AsyncIOMotorClient, id: str, environment: EnvironmentCreate) -> Optional[EnvironmentInDB]:
+#     result = await conn[database_name][collection_name].update_one({"_id": ObjectId(id)}, {"$set": environment.model_dump()})
+#     if result.modified_count == 1:
+#         updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+#         return EnvironmentInDB(**updated_environment)
+#     return None
 
-
-async def update_environment(conn: AsyncIOMotorClient, id: str, environment: EnvironmentUpdate) -> Optional[EnvironmentInDB]:
+@create_service_logger("environment", "update_environment", "environment")
+async def update_environment(conn: AsyncIOMotorClient, target_id: str, environment: EnvironmentUpdate) -> Optional[EnvironmentInDB]:
     # Cifrar los nuevos secretos antes de actualizar
     update_data = environment.model_dump(exclude_unset=True)
     update_data['secrets'] = encrypt_secrets(update_data['secrets'])
-    result = await conn[database_name][collection_name].update_one({"_id": ObjectId(id)}, {"$set": update_data})
+    result = await conn[database_name][collection_name].update_one({"_id": ObjectId(target_id)}, {"$set": update_data})
     if result.modified_count == 1:
-        updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(id)})
+        updated_environment = await conn[database_name][collection_name].find_one({"_id": ObjectId(target_id)})
         # Descifrar los secretos para la respuesta
         if updated_environment and updated_environment.get('secrets') is not None:
             updated_environment['secrets'] = decrypt_secrets(
@@ -254,7 +267,6 @@ async def update_environment_vercel_fields(
     return None
 
 
-
 async def update_environment_vercel_target(
     conn: AsyncIOMotorClient,
     id: str,
@@ -263,12 +275,11 @@ async def update_environment_vercel_target(
     """
     Updates the vercel target for an environment.
     """
-    print(f"🚀 -> 2222 vercel_target: {vercel_target}")
 
     updated_environment = await update_environment_vercel_fields(
         conn, id, EnvironmentVercelUpdate(vercel_target=vercel_target) # type: ignore
     )
-    print(f"🚀 -> 33333 updated_environment: {updated_environment}")
+
     if updated_environment:
         return True
     return False

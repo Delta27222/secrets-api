@@ -4,6 +4,8 @@ from bson import ObjectId
 from fastapi import HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from app.core.logging import create_service_logger
+
 from ..core.config import (
     database_name,
     project_members_collection_name,
@@ -80,8 +82,11 @@ async def update_project(conn: AsyncIOMotorClient, id: str, project: ProjectUpda
 
 async def delete_project(conn: AsyncIOMotorClient, id: str) -> bool:
     result = await conn[database_name][collection_name].delete_one({"_id": ObjectId(id)})
-    return result.deleted_count == 1
+    return await _delete_project(id, result)
 
+@create_service_logger("project", "delete_project", "project")
+async def _delete_project(target_id: str, result) -> bool:
+    return result.deleted_count == 1
 
 async def get_projects_for_user_in_organization(conn: AsyncIOMotorClient, email: str, organization_id: str) -> List[ProjectInDb]:
     is_admin = await is_admin_for_organization(conn, email, organization_id)
