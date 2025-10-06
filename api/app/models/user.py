@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-from .dbmodel import DBModelMixin
+from .dbmodel import DBModelMixin, PyObjectId
 from .rwmodel import RWModel
 
 
@@ -27,3 +27,13 @@ class UserInDB(DBModelMixin, User):
     class Config:
         from_attributes = True
         # populate_by_name = True
+
+
+class UserMinimal(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", serialization_alias="id", default=None)
+    display_name: Optional[str] = Field(None, alias='displayName')
+    email: Optional[EmailStr] = None
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
