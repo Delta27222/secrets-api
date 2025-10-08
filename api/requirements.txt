@@ -11,3 +11,4 @@ starlette
 PyGithub==2.5.0
 python-dotenv
 httpx
+asyncio
