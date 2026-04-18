@@ -1,4 +1,4 @@
-# Tek Secrets
+# Tek Secrets API
 
 API y herramientas para gestionar **secretos por proyecto y entorno** (desarrollo, staging, producción, etc.), con **organizaciones**, **miembros** y autenticación vía **GitHub OAuth**. Los datos viven en **MongoDB**; la API está construida con **FastAPI**.
 
