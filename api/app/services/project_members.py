@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Optional
 
 from bson import ObjectId
@@ -45,26 +46,28 @@ async def create_project_member(conn: AsyncIOMotorClient, project_member: Projec
     return ProjectMemberInDB(**new_member)
 
 
-async def create_many_project_members(conn: AsyncIOMotorClient, project_id: str,  project_members: List[ProjectMemberCreate]) -> ProjectMemberInDB:
+async def create_many_project_members(conn: AsyncIOMotorClient, project_id: str, project_members: List[ProjectMemberCreate]) -> ProjectMemberInDB:
     list_dict = [member.model_dump() for member in project_members]
     user_ids = [data.user for data in project_members]
-    # user = await get_user_by_id(conn, project_member.user)
-    users = []
-    for id in user_ids:
-        user_to_add = await get_user_by_id(conn, id)
-        if user_to_add == None:
+
+    # OPTIMIZACIÓN: obtener todos los usuarios en paralelo
+    users = await asyncio.gather(
+        *[get_user_by_id(conn, uid) for uid in user_ids],
+        return_exceptions=False
+    )
+
+    for user_to_add in users:
+        if user_to_add is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                 detail="Usuario no existe")
         existing_member = await get_project_member_by_user_id(conn, project_id, user_to_add.id)
         if existing_member:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                 detail="Miembro de proyecto ya existente")
+
     result = await conn.get_database(database_name).get_collection(collection_name).insert_many(
         list_dict
     )
-    # result = await conn[database_name][collection_name].insert_one(project_member_dict)
-    # new_member = await conn[database_name][collection_name].find_one({"_id": result.inserted_id})
-    # return ProjectMemberInDB(**new_member)
 
 
 async def update_project_member(conn: AsyncIOMotorClient, member_id: str, project_member: ProjectMemberUpdate) -> Optional[ProjectMemberInDB]:
@@ -117,13 +120,52 @@ async def delete_project_member(conn: AsyncIOMotorClient, member_id: str) -> boo
 
 
 async def get_project_members(conn: AsyncIOMotorClient, project_id: str) -> List[ProjectMemberInResponse]:
+    # OPTIMIZACIÓN: traer todos los miembros primero, luego hacer batch lookups
+    members_data = await conn[database_name][collection_name].find({"project": project_id}).to_list(None)
+
+    if not members_data:
+        return []
+
+    # Recopilar IDs únicos para batch lookups
+    user_ids = list(set(m['user'] for m in members_data))
+    project_ids = list(set(m['project'] for m in members_data))
+
+    # Ejecutar batch queries en paralelo
+    users_list, projects_list = await asyncio.gather(
+        _get_users_by_ids(conn, user_ids),
+        _get_projects_by_ids(conn, project_ids),
+        return_exceptions=False
+    )
+
+    # Construir dicts para lookup rápido
+    users_dict = {str(u.id): u for u in users_list if u}
+    projects_dict = {str(p.id): p for p in projects_list if p}
+
+    # Mapear datos
     members = []
-    data = conn[database_name][collection_name].find({"project": project_id})
-    async for member in data:
-        member['user'] = await get_user_by_id(conn, member['user'])
-        member['project'] = await _get_project_by_id(conn, member['project'])
+    for member in members_data:
+        member['user'] = users_dict.get(str(member['user']))
+        member['project'] = projects_dict.get(str(member['project']))
         members.append(ProjectMemberInResponse(**member))
+
     return members
+
+
+async def _get_users_by_ids(conn: AsyncIOMotorClient, user_ids: List[str]) -> List:
+    """Traer múltiples usuarios en una sola query."""
+    if not user_ids:
+        return []
+    users = await conn[database_name]["users"].find({"_id": {"$in": [ObjectId(uid) for uid in user_ids]}}).to_list(None)
+    from ..models.user import UserInDB
+    return [UserInDB(**u) for u in users]
+
+
+async def _get_projects_by_ids(conn: AsyncIOMotorClient, project_ids: List[str]) -> List[ProjectInDb]:
+    """Traer múltiples proyectos en una sola query."""
+    if not project_ids:
+        return []
+    projects = await conn[database_name][projects_collection_name].find({"_id": {"$in": [ObjectId(pid) for pid in project_ids]}}).to_list(None)
+    return [ProjectInDb(**p) for p in projects]
 
 
 async def get_project_member_by_environment_and_user(conn: AsyncIOMotorClient, environment_id: str, user_id: str):
