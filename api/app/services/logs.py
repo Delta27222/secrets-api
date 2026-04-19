@@ -56,7 +56,7 @@ async def get_logs_by_filters(
     per_page: int = 20,
 ) -> PaginatedLogsResponse:
     """Wrapper async que ejecuta queries en thread pool."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         None,
         _execute_log_query,
@@ -71,7 +71,7 @@ async def get_logs_by_filters(
 
 async def get_all_logs(page: int = 1, per_page: int = 20) -> PaginatedLogsResponse:
     """Wrapper async que ejecuta queries en thread pool."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         None,
         _execute_log_query,
