@@ -110,35 +110,41 @@ async def get_organization_member_by_email_and_org(conn: AsyncIOMotorClient, ema
 
 
 async def get_all_organization_memberships_by_email(conn: AsyncIOMotorClient, email: str) -> List[OrganizationMemberInResponse]:
-    # Obtener el usuario por su nombre de usuario
+    # OPTIMIZACIÓN: usar patrón asyncio.gather como en get_all_organization_memberships
     user = await get_user_by_email(conn, email)
     if not user:
         return []
 
+    members = await conn[database_name][collection_name].find({"email": email}).to_list(None)
+    if not members:
+        return []
+
+    # Recopilar IDs de organizaciones únicas y traerlas en paralelo
+    org_ids = list(set(m['organization_id'] for m in members))
+    organizations_list = await asyncio.gather(
+        *[get_organization_by_id(conn, oid) for oid in org_ids],
+        return_exceptions=False
+    )
+
+    # Construir dict para lookup rápido
+    org_dict = {str(o.id): o for o in organizations_list if o}
+
+    # Mapear datos
     memberships = []
-    async for member in conn[database_name][collection_name].find({"email": email}):
-        organization = await get_organization_by_id(conn, member['organization_id'])
+    for member in members:
         memberships.append(
             OrganizationMemberInResponse(
                 **member,
                 user=user,
-                organization=organization if organization else None
+                organization=org_dict.get(str(member['organization_id']))
             )
         )
     return memberships
 
 
 async def get_organization_member_with_details(conn: AsyncIOMotorClient, member_id: str) -> Optional[OrganizationMemberInResponse]:
-    member = await get_organization_member_by_id(conn, member_id)
-    if member:
-        user = await get_user_by_email(conn, member.email)
-        organization = await get_organization_by_id(conn, member.organization_id)
-        return OrganizationMemberInResponse(
-            **member.model_dump(),
-            user=user if user else None,
-            organization=organization
-        )
-    return None
+    # OPTIMIZACIÓN: get_organization_member_by_id ya carga user + org, no hacer double lookup
+    return await get_organization_member_by_id(conn, member_id)
 
 
 async def get_all_organization_memberships(conn: AsyncIOMotorClient, organization_id: str) -> List[OrganizationMemberInResponse]:

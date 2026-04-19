@@ -1,33 +1,39 @@
 import boto3
 import json
+import logging
 from ..core.config import SQS_QUEUE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION_NAME
 from ..models.sync import SqsParameters
 from datetime import datetime
 
-def send_log_to_sqs(log_data: SqsParameters):
-    """Send log data to AWS SQS."""
-    print(f"🚀 -> log_data: {log_data}")
-    print("🚀 [START] Enviando log a SQS...")
+logger = logging.getLogger(__name__)
 
-    # 👉 Obtener el dict original desde el modelo
-    log_data_dict = log_data.dict()
+_sqs_client = None
 
-    # 👉 Inyectar el date DENTRO del objeto de log
-    log_data_dict['date'] = datetime.utcnow().isoformat()
-
-    print("📦 [PAYLOAD] Log convertido a JSON:", log_data_dict)
-
-    try:
-        sqs = boto3.client(
+def _get_sqs_client():
+    """Singleton para el cliente SQS."""
+    global _sqs_client
+    if _sqs_client is None and all([SQS_QUEUE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
+        _sqs_client = boto3.client(
             'sqs',
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
             region_name=AWS_REGION_NAME
         )
-        print("✅ [SQS] Cliente SQS creado correctamente")
+    return _sqs_client
+
+def send_log_to_sqs(log_data: SqsParameters):
+    """Send log data to AWS SQS."""
+    sqs = _get_sqs_client()
+
+    if not sqs:
+        logger.warning("SQS no configurado. Credenciales faltantes.")
+        return None
+
+    try:
+        log_data_dict = log_data.dict()
+        log_data_dict['date'] = datetime.utcnow().isoformat()
 
         message_body = json.dumps(log_data_dict, ensure_ascii=False)
-
         message_attributes = {
             'EventType': {
                 'DataType': 'String',
@@ -39,7 +45,6 @@ def send_log_to_sqs(log_data: SqsParameters):
             }
         }
 
-        print("📤 [SENDING] Enviando mensaje a SQS...")
         response = sqs.send_message(
             QueueUrl=SQS_QUEUE_URL,
             DelaySeconds=0,
@@ -48,12 +53,9 @@ def send_log_to_sqs(log_data: SqsParameters):
         )
 
         message_id = response.get('MessageId')
-        print(f"✅ [SUCCESS] Log enviado a SQS correctamente. MessageId: {message_id}")
+        logger.debug(f"Log enviado a SQS. MessageId: {message_id}")
         return message_id
 
     except Exception as e:
-        print(f"❌ [ERROR] Falló el envío del mensaje a SQS: {e}")
+        logger.error(f"Error al enviar log a SQS: {e}")
         return None
-
-    finally:
-        print("🏁 [END] Finalizado el proceso de envío de log a SQS.")
