@@ -1,10 +1,11 @@
 import logging
 import time
+import asyncio
+import inspect
 from datetime import datetime
 from typing import Callable, Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-import inspect
 
 from ..models.sync import LoggingMiddlewareParameters, SqsParameters
 from ..services.sqs import send_log_to_sqs
@@ -39,13 +40,16 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
 
         # Información de la petición
+        safe_headers = {k: v for k, v in dict(request.headers).items()
+                       if k.lower() not in ['authorization', 'x-github-token']}
+
         request_info = {
             "timestamp": datetime.now().isoformat(),
             "method": request.method,
             "url": str(request.url),
             "path": request.url.path,
             "query_params": dict(request.query_params),
-            "headers": dict(request.headers),
+            "headers": safe_headers,
             "client_ip": request.client.host if request.client else None,
             "user_agent": request.headers.get("user-agent"),
         }
@@ -110,16 +114,15 @@ class ServiceLoggingMiddleware:
             "type": "service_call"
         }
 
-        logger.info(f"Service call: {service_name}.{method_name} - Params: {kwargs}")
+        logger.info(f"Service call: {service_name}.{method_name}")
 
         return log_data
 
     @staticmethod
-    def log_service_response(response_data, request_info: Optional[LoggingMiddlewareParameters], execution_time: Optional[float] = None):
+    async def log_service_response(response_data, request_info: Optional[LoggingMiddlewareParameters], execution_time: Optional[float] = None):
         """
-        Response of service logging
+        Response of service logging. Runs SQS send in thread pool to avoid blocking.
         """
-        print(f"🚀🚀🚀🚀🚀🚀 -> request_info: {request_info}")
         log_data = {
             "timestamp": datetime.now().isoformat(),
             "method": request_info.action if request_info else "unknown_action",
@@ -127,15 +130,20 @@ class ServiceLoggingMiddleware:
             "type": "service_response"
         }
 
-        # Siempre enviamos a SQS, usando valores por defecto si no hay request_info
-        send_log_to_sqs(SqsParameters(
-            user=(request_info.user_id if request_info and request_info.user_id else ""),
-            action=(request_info.action if request_info else "unknown_action"),
-            targetType=(request_info.target_type if request_info else "unknown_target"),
-            idTarget=(request_info.target_id if request_info and request_info.target_id else ""),
-            execution_time=execution_time,
-            details=(request_info.path if request_info else "internal"),
-        ))
+        # Enviar a SQS de forma no-bloqueante usando executor
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(
+            None,
+            send_log_to_sqs,
+            SqsParameters(
+                user=(request_info.user_id if request_info and request_info.user_id else ""),
+                action=(request_info.action if request_info else "unknown_action"),
+                targetType=(request_info.target_type if request_info else "unknown_target"),
+                idTarget=(request_info.target_id if request_info and request_info.target_id else ""),
+                execution_time=execution_time,
+                details=(request_info.path if request_info else "internal"),
+            )
+        )
 
         logger.info(
             f"Service response - Type: {type(response_data).__name__} - "
@@ -151,23 +159,27 @@ def create_service_logger(serviceName: str, action: str, targetType: str):
     def log_decorator(func):
         import functools
 
-        # Validar que el campo targetID y el userId este en el grupo de datos
+        # OPTIMIZACIÓN: cachear la firma UNA VEZ al decorar, no en cada invocación
+        func_signature = inspect.signature(func)
 
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             start_time = time.time()
             request_info = None
-            # Tryying to get request context
 
-            # Obtener los parámetros con nombres
-            bound_args = inspect.signature(func).bind(*args, **kwargs)
+            # Obtener los parámetros con nombres (sig ya cacheada)
+            bound_args = func_signature.bind(*args, **kwargs)
             bound_args.apply_defaults()
             params = dict(bound_args.arguments)
 
             try:
                 request: Request = request_context.get()
-                print(f"🚀 -> request: {request}")
                 headers = dict(request.headers)
+
+                # Filtrar headers sensibles para logging
+                safe_headers = {k: v for k, v in headers.items()
+                               if k.lower() not in ['authorization', 'x-github-token']}
+
                 github_token = headers.get("x-github-token")
 
                 current_user = None
@@ -188,21 +200,20 @@ def create_service_logger(serviceName: str, action: str, targetType: str):
                 )
 
             except LookupError:
-                logger.warning("⚠️ No hay request en el contexto. Usando valores por defecto para logging.")
+                logger.warning("🚧 No hay request en el contexto. Usando valores por defecto para logging.")
             except Exception as e:
                 logger.error(f"❌ Error al construir request_info: {str(e)}")
 
             try:
                 # Make the function call of the service
                 result = await func(*args, **kwargs)
-                print(f"🚀 -> result: {result}")
 
                 execution_time = time.time() - start_time
 
-                # Log the service call
-                ServiceLoggingMiddleware.log_service_response(
+                # Log the service call (now async)
+                await ServiceLoggingMiddleware.log_service_response(
                     result,
-                    request_info, # type: ignore
+                    request_info,
                     execution_time,
                 )
 
