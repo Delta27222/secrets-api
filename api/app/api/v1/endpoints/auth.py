@@ -29,8 +29,8 @@ async def get_github_token(
         data = await auth_services.get_github_token(code)
         if data == None:
             raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"Cannot get access token from Github"
+                status_code=400,
+                detail="Cannot get access token from Github"
             )
         return TokenResponse(
             access_token=data["access_token"],
