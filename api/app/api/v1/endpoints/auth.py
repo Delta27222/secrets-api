@@ -1,16 +1,15 @@
-import os
-from typing import List, Optional
+from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from app.models.auth import TokenResponse
-from app.models.user import UserInDB
-
+from ....core.config import GITHUB_ORG_NAME
 from ....core.utils import create_aliased_response
 from ....db.mongodb import AsyncIOMotorClient, get_database
+from ....models.auth import TokenResponse
 from ....models.user import UserInDB
 from ....services import auth as auth_services
+from ....services.github_org_validation import validate_user_in_github_org
 from ....services.users import get_or_create_user
 
 router = APIRouter(
@@ -60,11 +59,30 @@ async def auth_github(
         raise HTTPException(status_code=400, detail="GitHub token is required")
 
     try:
+        # Validate GitHub org membership before creating user
+        if GITHUB_ORG_NAME:
+            from github import Github
+            gh = Github(github_token)
+            gh_user = gh.get_user()
+
+            is_member, message = await validate_user_in_github_org(
+                github_token=github_token,
+                org_name=GITHUB_ORG_NAME,
+                github_username=gh_user.login
+            )
+
+            if not is_member:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"No perteneces a la organización '{GITHUB_ORG_NAME}'. Contacta al administrador."
+                )
 
         # Get or create user in DB
         user = await get_or_create_user(db, github_token)
 
         return create_aliased_response(user)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Authentication failed: {str(e)}")
