@@ -68,10 +68,13 @@ def login(
             github_token = auth.get_valid_token()
         else:
             auth_code = get_github_auth_code()
-            github_token = exchange_code_for_token(auth_code)
+            github_token = exchange_code_for_token(auth_code, dev=dev)
 
-        # URL del endpoint de tu API FastAPI para autenticación con GitHub
-        # Ajusta esta URL según tu configuración
+        if not github_token:
+            typer.echo("❌ Failed to obtain GitHub token.")
+            raise typer.Exit(code=1)
+
+        # Validate organization membership via API
         api_url = f"{API_URL}/v1/auth/github"
         headers = {
             "X-GitHub-Token": github_token
@@ -83,10 +86,17 @@ def login(
             user_data = response.json()
             typer.echo(
                 f"✅ User authenticated: Welcome, {user_data.get('username', 'User')}!")
+        elif response.status_code == 403:
+            auth.clear_stored_token()
+            typer.echo(
+                "❌ Access denied: you are not a member of the required organization.")
+            raise typer.Exit(code=1)
         else:
             typer.echo(
                 f"❌ Authentication error: {response.status_code} - {response.text}")
 
+    except typer.Exit:
+        raise
     except Exception as e:
         typer.echo(f"❌ Authentication error: {e}")
 
