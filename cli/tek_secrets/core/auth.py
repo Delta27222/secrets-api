@@ -14,6 +14,9 @@ from starlette.datastructures import Secret
 
 from .config import CLIENT_ID, DEV_API_URL, PROD_API_URL, REDIRECT_URI
 
+# API URL for organization validation (defaults to PROD)
+_active_api_url = PROD_API_URL
+
 # Global variable to store the OAuth authorization code
 auth_code = None
 
@@ -190,7 +193,7 @@ def get_github_auth_code() -> str:
     params = {
         'client_id': CLIENT_ID,
         'redirect_uri': REDIRECT_URI,
-        'scope': 'user user:email',  # Adjust scopes as needed
+        'scope': 'user user:email read:org',  # Includes org access for membership validation
         'response_type': 'code',
     }
     auth_url = f"https://github.com/login/oauth/authorize?{urllib.parse.urlencode(params)}"
@@ -269,11 +272,59 @@ def github_login_flow() -> Optional[str]:
         return None
 
 
-def get_github_token_or_start_flow() -> str:
+def validate_org_membership(github_token: str, api_url: Optional[str] = None) -> bool:
+    """
+    Validate that the user belongs to the required GitHub organization
+    by calling POST /v1/auth/github on the API.
+
+    Args:
+        github_token: GitHub access token
+        api_url: API base URL (defaults to _active_api_url)
+
+    Returns:
+        True if user is a valid org member, False otherwise
+    """
+    url = f"{api_url or _active_api_url}/v1/auth/github"
+    headers = {"X-GitHub-Token": github_token}
+
+    try:
+        response = requests.post(url, headers=headers)
+        if response.status_code == 200:
+            return True
+        elif response.status_code == 403:
+            print("❌ Access denied: you are not a member of the required organization.")
+            return False
+        else:
+            print(f"❌ Authentication failed: {response.status_code} - {response.text}")
+            return False
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error validating organization membership: {e}")
+        return False
+
+
+def get_github_token_or_start_flow(dev: Optional[bool] = False) -> Optional[str]:
+    """
+    Get a valid GitHub token (from storage or OAuth flow) and validate
+    that the user belongs to the required organization.
+
+    Returns:
+        GitHub access token if valid and org member, None otherwise
+    """
+    api_url = DEV_API_URL if dev else PROD_API_URL
+
     authorized = is_authorized()
     if authorized:
         github_token = get_valid_token()
     else:
         auth_code = get_github_auth_code()
-        github_token = exchange_code_for_token(auth_code)
+        github_token = exchange_code_for_token(auth_code, dev=dev)
+
+    if not github_token:
+        return None
+
+    # Validate organization membership
+    if not validate_org_membership(github_token, api_url=api_url):
+        clear_stored_token()
+        return None
+
     return github_token
