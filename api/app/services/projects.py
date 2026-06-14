@@ -12,11 +12,13 @@ from ..core.config import (
     project_members_collection_name,
     projects_collection_name,
 )
+from ..core.mongo_query import id_query_value
 from ..models.dbmodel import PyObjectId
 from ..models.environment import EnvironmentCreate
 from ..models.project import ProjectCreate, ProjectInDb, ProjectUpdate
 from ..models.project_member import ProjectMemberCreate, ProjectRole
 from .environment import create_environment
+from .encryption_keys import initialize_project_encryption_key
 from .organization_members import is_admin_for_organization
 from .project_members import create_project_member
 from .users import get_user_by_email
@@ -46,6 +48,14 @@ async def create_project(conn: AsyncIOMotorClient, project: ProjectCreate, organ
     except Exception as e:
         raise HTTPException(
             status_code=400, detail='Cannot create project member for new project'
+        )
+
+    # Initialize encryption key for the project before creating environments
+    try:
+        await initialize_project_encryption_key(conn, project_id=new_project.id, created_by=creator_user_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f'Cannot initialize encryption key for new project: {e}'
         )
 
     try:
@@ -90,35 +100,37 @@ async def _delete_project(target_id: str, result) -> bool:
     return result.deleted_count == 1
 
 async def get_projects_for_user_in_organization(conn: AsyncIOMotorClient, email: str, organization_id: str) -> List[ProjectInDb]:
+    org_filter = {"organization_id": id_query_value(organization_id)}
+
     # Obtener el estado de administrador y el usuario de forma concurrente
     is_admin, user = await asyncio.gather(
         is_admin_for_organization(conn, email, organization_id),
         get_user_by_email(conn, email)
     )
 
+    if not user:
+        return []
+
     if is_admin:
         # Si el usuario es administrador, obtenemos todos los proyectos de la organización en una sola consulta
-        projects = await conn[database_name][projects_collection_name].find({"organization_id": organization_id}).to_list(length=None)
+        projects = await conn[database_name][projects_collection_name].find(org_filter).to_list(length=None)
         return [ProjectInDb(**project) for project in projects]
 
     # Si el usuario no es administrador, obtenemos los proyectos asociados al usuario en una sola consulta
     # Primero, obtenemos los proyectos de la organización
-    org_projects = await conn[database_name][projects_collection_name].find({"organization_id": organization_id}).to_list(length=None)
+    org_projects = await conn[database_name][projects_collection_name].find(org_filter).to_list(length=None)
 
-    # Obtenemos los IDs de los proyectos en los que el usuario está asociado
-    project_ids = [
-        project['id'] for project in org_projects
-    ]
+    if not org_projects:
+        return []
 
-    if not project_ids:
-        return []  # Si no hay proyectos, retornamos una lista vacía
+    org_project_ids = [str(p["_id"]) for p in org_projects]
 
     # Obtenemos los proyectos en los que el usuario está involucrado
     user_project_memberships_projects = await conn.get_database(database_name).get_collection(project_members_collection_name).find(
         {
             "user": user.id,
             "project": {
-                "$in": [project.id for project in org_projects]
+                "$in": org_project_ids
             }
         },
         {

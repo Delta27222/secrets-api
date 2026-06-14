@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -78,9 +79,19 @@ class EnvironmentVercelTarget(BaseModel):
         default=None, description="Targets para el proyecto de Vercel (opcional)"
     )
 
+class SecretsEncryptionMetadata(BaseModel):
+    key_version: Optional[int] = Field(default=None, description="Versión de la llave usada")
+    encrypted_with_key_id: Optional[str] = Field(default=None, description="ID de la llave usada para encriptar")
+    encrypted_at: Optional[datetime] = Field(default=None, description="Fecha de encriptación")
+    requires_reencryption: bool = Field(default=False, description="Si requiere re-encriptación")
+
+
 class Environment(EnvironmentBase):
     project_id: str = Field(..., description="ID del proyecto asociado")
     secrets: Dict[str, Any] = Field(default={})
+    secrets_encryption: Optional[SecretsEncryptionMetadata] = Field(
+        default=None, description="Metadata de encriptación de secretos"
+    )
 
     class Config:
         from_attributes = True

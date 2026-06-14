@@ -6,6 +6,7 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import database_name, organization_members_collection_name
+from ..core.mongo_query import id_query_value
 from ..models.organization import Organization, OrganizationCreate, OrganizationInDB
 from ..models.organization_member import (
     MembershipStatus,
@@ -23,6 +24,7 @@ collection_name = organization_members_collection_name
 
 
 async def is_admin_for_organization(db: AsyncIOMotorClient, email: str, organization_id: str) -> bool:
+    organization_id = str(organization_id)
     member = await get_organization_member_by_email_and_org(db, email, organization_id)
     return member is not None and member.role in ["admin", "owner"] and member.status == MembershipStatus.accepted
 
@@ -95,7 +97,7 @@ async def accept_invitation(conn: AsyncIOMotorClient, member_id: str) -> Optiona
 async def get_organization_member_by_email_and_org(conn: AsyncIOMotorClient, email: str, organization_id: str) -> Optional[OrganizationMemberInResponse]:
     # Obtener el miembro de una organización específica para un usuario
     member = await conn[database_name][collection_name].find_one({
-        "organization_id": organization_id,
+        "organization_id": id_query_value(organization_id),
         "email": email
     })
     if member:
