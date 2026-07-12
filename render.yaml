@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: tek-secrets-api
+    plan: free
+    runtime: python
+    pythonVersion: 3.12.13
+    buildCommand: cd api && pip install -r requirements.txt
+    startCommand: cd api && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGODB_URL
+        scope: run
+      - key: MONGO_DB
+        value: secrets-27222
+      - key: MONGODB_CSFLE_MASTER_KEY
+        scope: run
+      - key: GITHUB_CLIENT_ID
+        scope: run
+      - key: GITHUB_CLIENT_SECRET
+        scope: run
+      - key: SECRET_KEY
+        scope: run
