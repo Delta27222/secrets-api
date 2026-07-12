@@ -128,7 +128,10 @@ async def seed_full_project():
             "organization_members",
             "organizations",
             "project_members",
-            "projects"
+            "projects",
+            "service_token_rotations",
+            "token_permissions",
+            "service_tokens",
         ]
 
         for coll_name in collections_to_clear:
