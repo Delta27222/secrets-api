@@ -1,0 +1,24 @@
+# Secretos y estado — NUNCA commitear
+# Cualquier .tfvars (menos la plantilla .example)
+*.tfvars
+!*.tfvars.example
+
+# Cualquier archivo de entorno
+.env
+.env.*
+*.env
+!*.env.example
+
+# Artefactos de build
+terraform/*.zip
+
+# Estado de Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/tfplan
+terraform/*_outputs.json
+
+# OS
+.DS_Store

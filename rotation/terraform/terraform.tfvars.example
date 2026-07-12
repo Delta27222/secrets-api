@@ -1,0 +1,33 @@
+# ============================================================================
+# terraform.tfvars — PLANTILLA
+# Copiar a terraform.tfvars y completar. terraform.tfvars está en .gitignore.
+# ============================================================================
+
+aws_region   = "us-east-1"
+project_name = "tek-secrets"
+environment  = "prod"
+
+# --- MongoDB (para el Lambda Maestro: lista proyectos) ---
+mongodb_url = "mongodb+srv://USER:PASSWORD@cluster.mongodb.net/?retryWrites=true&w=majority"
+mongo_db    = "secrets-27222"
+
+# --- API en Render + service token (para el Lambda Worker) ---
+# La API hace la rotación + CSFLE. Los Lambdas NO manejan encriptación.
+api_base_url       = "https://tu-app.onrender.com"   # sin slash final
+rotation_api_token = "tok_..."                        # token de sistema, scope keys:rotate
+
+# --- EventBridge (cron) + política de rotación ---
+rotation_schedule      = "cron(0 0 * * ? *)"   # cada cuánto REVISA (diario)
+rotation_interval_days = 90                     # cada cuánto ROTA una llave (días)
+
+# --- Lambda ---
+lambda_master_memory  = 256
+lambda_master_timeout = 60
+lambda_worker_memory  = 256
+lambda_worker_timeout = 900
+
+# --- SQS ---
+sqs_visibility_timeout = 900
+sqs_message_retention  = 86400
+sqs_max_receive_count  = 3
+sqs_batch_size         = 1
