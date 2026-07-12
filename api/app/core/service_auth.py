@@ -25,6 +25,8 @@ class Scope(str, Enum):
     PROJECTS_READ = "projects:read"
     PROJECTS_LIST = "projects:list"
     ORG_READ = "org:read"
+    # Scope de sistema: rotar llaves de encriptación (usado por Lambda Worker)
+    KEYS_ROTATE = "keys:rotate"
 
 
 service_token_bearer = HTTPBearer(

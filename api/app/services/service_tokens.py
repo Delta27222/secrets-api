@@ -41,7 +41,7 @@ class ServiceTokenGenerator:
     @staticmethod
     async def generate_token(
         db: AsyncIOMotorClient,
-        project_id: ObjectId,
+        project_id: Optional[ObjectId],
         owner_id: ObjectId,
         name: str,
         scopes: List[str],
@@ -56,7 +56,7 @@ class ServiceTokenGenerator:
 
         Args:
             db: MongoDB client
-            project_id: Proyecto dueño (REQUERIDO)
+            project_id: Proyecto dueño (None = token de sistema, acceso global)
             owner_id: Usuario que crea
             name: Nombre del token
             scopes: Permisos

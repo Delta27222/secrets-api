@@ -33,7 +33,7 @@ class ServiceTokenCreate(ServiceTokenBase):
 class ServiceTokenResponse(ServiceTokenBase):
     """Token response (sin secret)"""
     token_id: str = Field(..., alias='tokenId')
-    project_id: PyObjectId = Field(..., alias='projectId')  # REQUERIDO
+    project_id: Optional[PyObjectId] = Field(None, alias='projectId')  # None = token de sistema (global)
     owner_id: PyObjectId = Field(..., alias='ownerId')
     created_at: datetime = Field(..., alias='createdAt')
     expires_at: datetime = Field(..., alias='expiresAt')
