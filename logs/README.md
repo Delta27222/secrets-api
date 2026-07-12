@@ -213,3 +213,43 @@ terraform import aws_eip.questdb <eip-alloc-id>
 
 > El nombre del dispositivo EBS varía (`/dev/xvdf` vs `/dev/nvme1n1` en instancias
 > Nitro); el script `questdb_userdata.sh` detecta automáticamente el que exista.
+
+## Comandos rápidos (build · deploy · pausar · eliminar)
+
+```bash
+# ── BUILD (empaquetar la Lambda consumidora) ───────────────
+cd /Users/delta27222/Desktop/tesis/tek-secrets/logs
+./scripts/build_consumer.sh    # genera terraform/lambda_consumer.zip (pg8000)
+
+# ── DEPLOY (crear/actualizar en AWS) ───────────────────────
+cd terraform
+terraform init
+terraform apply
+
+# ── PROBAR (consultar QuestDB + logs de la Lambda) ─────────
+IP=$(terraform output -raw questdb_public_ip)
+curl -s -G "http://$IP:9000/exec" --data-urlencode "query=SELECT * FROM Logs LIMIT -10;"
+aws logs tail /aws/lambda/tek-secrets-questdb-consumer --region us-east-1 --since 2m
+
+# ── PAUSAR (Stop EC2 — deja de facturar cómputo, conserva datos) ──
+ID=$(terraform output -raw questdb_instance_id)
+aws ec2 stop-instances  --instance-ids "$ID" --region us-east-1
+# Reanudar (la Elastic IP no cambia):
+aws ec2 start-instances --instance-ids "$ID" --region us-east-1
+
+# ── ELIMINAR (borra todo lo de AWS) ────────────────────────
+cd /Users/delta27222/Desktop/tesis/tek-secrets/logs/terraform
+terraform destroy
+# Solo un recurso:
+terraform destroy -target=aws_lambda_function.consumer
+```
+
+| Acción | Efecto | Recursos | Datos |
+|--------|--------|----------|-------|
+| `stop-instances` | pausa la EC2 | siguen creados | conservados (EBS) |
+| `start-instances` | reanuda la EC2 | — | misma IP (EIP) |
+| `terraform destroy` | borra todo | eliminados | ⚠️ se pierden sin snapshot |
+
+> ⚠️ A diferencia de la rotación (serverless, `$0` en reposo), aquí un `stop` deja de
+> facturar cómputo pero **sigues pagando el EBS y la EIP**. Solo `terraform destroy`
+> lleva el costo a cero (y borra los datos).
