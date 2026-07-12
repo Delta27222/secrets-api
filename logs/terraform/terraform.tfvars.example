@@ -1,0 +1,36 @@
+# ============================================================================
+# terraform.tfvars — PLANTILLA (Logs / QuestDB)
+# Copiar a terraform.tfvars y completar. terraform.tfvars está en .gitignore.
+# ============================================================================
+
+aws_region        = "us-east-1"
+availability_zone = "us-east-1a"
+project_name      = "tek-secrets"
+environment       = "prod"
+
+# --- EC2 / QuestDB ---
+instance_type    = "t3.small"
+questdb_version  = "8.1.1"
+data_volume_size = 20            # GB para los datos de logs
+key_name         = ""            # nombre de tu key pair EC2 si quieres SSH
+
+# --- Acceso ---
+# ⚠️ En producción, restringe a la IP saliente de la API en Render, no 0.0.0.0/0
+allowed_cidr = ["0.0.0.0/0"]
+ssh_cidr     = ""                # ej: "TU.IP.PUBLICA/32" para abrir SSH solo a ti
+
+# --- SQS ---
+sqs_visibility_timeout = 60      # debe ser >= consumer_timeout
+sqs_message_retention  = 345600
+sqs_max_receive_count  = 5
+
+# --- Lambda consumidora (SQS -> QuestDB) ---
+consumer_timeout    = 30
+consumer_memory     = 128
+consumer_batch_size = 10
+
+# Credenciales del protocolo Postgres-wire de QuestDB (8812).
+# QuestDB trae por defecto admin/quest; cámbialas si endureces la instancia.
+questdb_pg_user     = "admin"
+questdb_pg_password = "quest"
+questdb_pg_database = "qdb"

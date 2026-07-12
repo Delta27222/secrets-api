@@ -58,7 +58,9 @@ class LogResponse(BaseModel):
     targetType: str
     idTarget: str
     details: Optional[str] = None
-    execution_time: Optional[str] = None  # QuestDB devuelve como string
+    # QuestDB devuelve execution_time como DOUBLE (número). El front hace
+    # parseFloat, así que un número sirve. Optional por si la fila viene sin él.
+    execution_time: Optional[float] = None
 
     class Config:
         from_attributes = True
