@@ -2,6 +2,8 @@
 
 Documentación completa para ejecutar los scripts de inicialización de la base de datos.
 
+> 📖 **API en producción (Swagger docs):** https://secrets-api-gdl3.onrender.com/docs
+
 ---
 
 ## ▶️ Correr el API localmente
