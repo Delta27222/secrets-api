@@ -5,7 +5,8 @@ Usados para operaciones de sistema como la rotación de llaves ejecutada por
 el Lambda Worker. A diferencia de los tokens normales, NO están atados a un
 proyecto (project_id = None) y por eso pueden operar sobre cualquiera.
 
-Seguridad: solo los emails en SYSTEM_ADMIN_EMAILS (config) pueden crearlos.
+Seguridad: solo owners/admins de alguna organización pueden crearlos
+(se valida el rol real del usuario que hace la petición).
 """
 
 from typing import List, Optional
@@ -18,15 +19,16 @@ from datetime import datetime
 
 from ....core.auth import get_current_user
 from ....core.config import (
-    SYSTEM_ADMIN_EMAILS,
     database_name,
     service_tokens_collection_name,
 )
 from ....core.service_auth import Scope
 from ....db.mongodb import AsyncIOMotorClient, get_database
 from ....models.user import UserInDB
+from ....models.organization_member import MembershipStatus
 from ....models.service_token import ServiceTokenCreateResponse, ServiceTokenResponse
 from ....services.service_tokens import ServiceTokenGenerator
+from ....services.organization_members import get_all_organization_memberships_by_email
 
 router = APIRouter(tags=["system-tokens"])
 
@@ -44,18 +46,25 @@ class SystemTokenCreate(BaseModel):
 
 async def require_system_admin(
     current_user: UserInDB = Depends(get_current_user),
+    db: AsyncIOMotorClient = Depends(get_database),
 ) -> UserInDB:
-    """Permite solo a emails en SYSTEM_ADMIN_EMAILS crear tokens de sistema."""
-    if not SYSTEM_ADMIN_EMAILS:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="SYSTEM_ADMIN_EMAILS no configurado en el servidor",
-        )
-    email = (current_user.email or "").lower()
-    if email not in SYSTEM_ADMIN_EMAILS:
+    """
+    Autoriza tokens de sistema si el usuario es owner/admin de alguna organización.
+
+    Valida contra el rol real en BD (no una lista hardcodeada), usando la
+    identidad del usuario que hace la petición.
+    """
+    memberships = await get_all_organization_memberships_by_email(
+        db, current_user.email
+    )
+    is_admin_anywhere = any(
+        m.role in ["admin", "owner"] and m.status == MembershipStatus.accepted
+        for m in memberships
+    )
+    if not is_admin_anywhere:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No autorizado para crear tokens de sistema",
+            detail="Solo owners/admins de una organización pueden gestionar tokens de sistema",
         )
     return current_user
 
@@ -69,7 +78,7 @@ async def create_system_token(
     """
     Crea un token de servicio de sistema (global, sin proyecto).
 
-    Requiere que el email del usuario esté en SYSTEM_ADMIN_EMAILS.
+    Requiere ser owner/admin de alguna organización.
     El token_secret se muestra UNA sola vez — guárdalo (va en el Lambda).
     """
     try:

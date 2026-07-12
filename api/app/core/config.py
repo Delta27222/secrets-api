@@ -13,14 +13,6 @@ load_dotenv(".env")
 # Encryption
 MONGODB_CSFLE_MASTER_KEY = os.getenv("MONGODB_CSFLE_MASTER_KEY", "")
 
-# Service tokens de sistema (globales): solo estos emails pueden crearlos.
-# Coma-separado. Ej: "admin@empresa.com,otro@empresa.com"
-SYSTEM_ADMIN_EMAILS = [
-    e.strip().lower()
-    for e in os.getenv("SYSTEM_ADMIN_EMAILS", "").split(",")
-    if e.strip()
-]
-
 # Connections
 MAX_CONNECTIONS_COUNT = int(os.getenv("MAX_CONNECTIONS_COUNT", 10))
 MIN_CONNECTIONS_COUNT = int(os.getenv("MIN_CONNECTIONS_COUNT", 10))
