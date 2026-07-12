@@ -129,12 +129,25 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+*.env
+!*.env.example
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Terraform & secretos (defensa en profundidad, aplica a todo el repo)
+*.tfvars
+!*.tfvars.example
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+tfplan
+*_outputs.json
 
 # Spyder project settings
 .spyderproject
