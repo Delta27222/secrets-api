@@ -42,6 +42,55 @@ AWS_REGION_NAME = os.getenv("AWS_REGION_NAME", "us-east-1")
 # QuestDB
 EC2_INSTANCE_IP = os.getenv("EC2_INSTANCE_IP", "")
 EC2_INSTANCE_PORT = int(os.getenv("EC2_INSTANCE_PORT", 9000))
+
+# Autodescubrimiento de la IP de QuestDB desde AWS.
+# Si EC2_INSTANCE_IP NO está definida, se busca la instancia EC2 con
+# tag Name = QUESTDB_INSTANCE_NAME (creada por el módulo Terraform de logs)
+# y se toma su IP pública. Si EC2_INSTANCE_IP está definida, esa tiene prioridad.
+QUESTDB_INSTANCE_NAME = os.getenv("QUESTDB_INSTANCE_NAME", "tek-secrets-questdb")
+
+
+def _discover_questdb_ip() -> str:
+    """Devuelve la IP pública de la instancia EC2 de QuestDB (o '' si falla)."""
+    try:
+        import logging
+        import boto3
+        from botocore.config import Config as _BotoConfig
+
+        ec2 = boto3.client(
+            "ec2",
+            region_name=AWS_REGION_NAME,
+            config=_BotoConfig(connect_timeout=5, read_timeout=5, retries={"max_attempts": 1}),
+        )
+        resp = ec2.describe_instances(
+            Filters=[
+                {"Name": "tag:Name", "Values": [QUESTDB_INSTANCE_NAME]},
+                {"Name": "instance-state-name", "Values": ["running"]},
+            ]
+        )
+        for reservation in resp.get("Reservations", []):
+            for inst in reservation.get("Instances", []):
+                ip = inst.get("PublicIpAddress")
+                if ip:
+                    logging.getLogger(__name__).info(
+                        f"QuestDB autodescubierta en AWS: {ip} (tag Name={QUESTDB_INSTANCE_NAME})"
+                    )
+                    return ip
+        logging.getLogger(__name__).warning(
+            f"No se encontró instancia EC2 running con tag Name={QUESTDB_INSTANCE_NAME}"
+        )
+        return ""
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            f"No se pudo autodescubrir la IP de QuestDB desde AWS: {e}"
+        )
+        return ""
+
+
+if not EC2_INSTANCE_IP:
+    EC2_INSTANCE_IP = _discover_questdb_ip()
+
 EC2_INSTANCE_URL = os.getenv("EC2_INSTANCE_DB", f'http://{EC2_INSTANCE_IP}:{EC2_INSTANCE_PORT}')
 
 if not MONGODB_URL:
