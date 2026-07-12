@@ -35,7 +35,14 @@ def _execute_log_query(
     start = (page - 1) * per_page
     end = start + per_page
     page_rows = rows[start:end]
-    data = [LogResponse(**row) for row in page_rows]
+    # La tabla Logs de QuestDB no tiene columna `id`; el front la usa solo como
+    # React key. Se sintetiza una única por fila (date tiene precisión de micros).
+    data = []
+    for i, row in enumerate(page_rows):
+        row = dict(row)
+        if not row.get("id"):
+            row["id"] = f"{row.get('date', '')}-{row.get('idTarget', '')}-{start + i}"
+        data.append(LogResponse(**row))
     total_pages = (total + per_page - 1) // per_page if per_page else 0
 
     meta = PaginationMeta(
