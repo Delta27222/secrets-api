@@ -1,0 +1,23 @@
+# Secretos y estado — NUNCA commitear
+*.tfvars
+!*.tfvars.example
+
+.env
+.env.*
+*.env
+!*.env.example
+
+# Estado de Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/tfplan
+terraform/*_outputs.json
+
+# Artefactos de build de la Lambda consumidora
+terraform/lambda_consumer.zip
+lambda/consumer/build/
+
+# OS
+.DS_Store
