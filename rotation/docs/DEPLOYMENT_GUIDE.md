@@ -91,7 +91,7 @@ flowchart TD
     SQS -.->|falla 3+ veces| DLQ[[💀 SQS DLQ]]
     W -->|POST · Bearer tok_| API[☁️ API en Render<br/>FastAPI + CSFLE]
     API -->|genera/rota/re-encripta| DB
-    API -->|auditoría| Q[(📊 QuestDB)]
+    %% API -->|auditoría| Q[(📊 QuestDB)]
     M -.logs.-> CW[[📈 CloudWatch]]
     W -.logs.-> CW
 
