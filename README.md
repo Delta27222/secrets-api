@@ -48,6 +48,43 @@ Encripta en MongoDB el campo `key_material` de `encryption_keys` que aún esté 
 cd /Users/delta27222/Desktop/tesis/tek-secrets/api && source .venv/bin/activate && python -m scripts.migrate_csfle
 ```
 
+## ▶️ Infraestructura AWS (crear / eliminar)
+
+Orquestador [`infra.sh`](./infra.sh) — crea o elimina **toda** la infraestructura de
+AWS de los dos módulos: **logs** (QuestDB + SQS + Lambda consumidora) y **rotation**
+(EventBridge + Lambdas + SQS). Empaqueta los Lambdas y corre Terraform por ti.
+
+```bash
+cd /Users/delta27222/Desktop/tesis/tek-secrets
+
+./infra.sh create [logs|rotation|all]   # build de los Lambdas + terraform apply
+./infra.sh delete [logs|rotation|all]   # terraform destroy (pide confirmación)
+```
+
+| Comando | Qué hace |
+|---------|----------|
+| `./infra.sh create` | Crea **ambos** (default `all`): empaqueta Lambdas + `terraform apply` de `logs` y `rotation` |
+| `./infra.sh create logs` | Solo logs: `build_consumer.sh` + `apply` |
+| `./infra.sh create rotation` | Solo rotación: `build_master.sh` + `build_worker.sh` + `apply` |
+| `./infra.sh delete all` | Destruye **ambos** (rotación primero, logs después) |
+| `./infra.sh delete logs` | Solo logs (⚠️ borra el EBS → se pierden los logs) |
+
+**Flags:**
+
+| Flag | Efecto |
+|------|--------|
+| `logs` \| `rotation` \| `all` | Módulo objetivo (default `all`) |
+| `-y`, `--yes` | En `delete`, no pide confirmación |
+| `-h`, `--help` | Muestra la ayuda |
+
+- **`create`** verifica que exista `terraform.tfvars` en cada módulo; si falta, avisa
+  cómo crearlo desde el `.example` y no arranca.
+- **`delete`** es destructivo: pide escribir `destroy` para confirmar (salvo `-y`).
+- Al terminar, **recuerda hacer el build/deploy de la API en Render** para que tome
+  los cambios (IPs, colas, Lambdas).
+
+> Detalle de cada módulo por separado → [`INFRAESTRUCTURA.md`](./INFRAESTRUCTURA.md).
+
 ---
 
 ## 📋 Requisitos Previos

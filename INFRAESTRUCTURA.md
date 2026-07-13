@@ -6,9 +6,46 @@ independientes y separados**: cada uno vive en su propia carpeta, con su propio
 
 ```
 tek-secrets/
+├── infra.sh      # Orquestador: crea/elimina ambos módulos
 ├── rotation/     # 1. Rotación automática de llaves (serverless)
 └── logs/         # 2. Logs con QuestDB (EC2 + SQS)
 ```
+
+---
+
+## Script orquestador — `infra.sh`
+
+Crea o elimina **todo** (logs + rotación) con un comando. Vive en la raíz del
+backend (`tek-secrets/`).
+
+```bash
+cd tek-secrets
+
+./infra.sh create [logs|rotation|all]   # build de los Lambdas + terraform apply
+./infra.sh delete [logs|rotation|all]   # terraform destroy (pide confirmación)
+```
+
+| Comando | Qué hace |
+|---------|----------|
+| `./infra.sh create` | Crea **ambos** módulos (default `all`): empaqueta los Lambdas y hace `terraform init/apply` de `logs` y `rotation` |
+| `./infra.sh create logs` | Solo logs: `build_consumer.sh` + `apply` |
+| `./infra.sh create rotation` | Solo rotación: `build_master.sh` + `build_worker.sh` + `apply` |
+| `./infra.sh delete all` | Destruye **ambos** (rotación primero, logs después) |
+| `./infra.sh delete logs` | Solo logs (⚠️ borra el EBS → se pierden los logs) |
+
+**Flags:**
+
+| Flag | Efecto |
+|------|--------|
+| `logs` \| `rotation` \| `all` | Módulo objetivo (default `all`) |
+| `-y`, `--yes` | En `delete`, no pide confirmación |
+| `-h`, `--help` | Muestra la ayuda |
+
+- **`create`** verifica que exista `terraform.tfvars` en cada módulo; si falta, avisa
+  cómo crearlo desde el `.example` y no arranca.
+- **`delete`** es destructivo: pide escribir `destroy` para confirmar (salvo `-y`).
+- Al terminar, **recuerda hacer el build/deploy de la API en Render** para que tome
+  los cambios de infraestructura (IPs, colas, Lambdas).
 
 ---
 
