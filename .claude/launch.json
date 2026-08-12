@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tek-secrets-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "/Users/delta27222/Desktop/tesis/tek-secrets-app"],
+      "port": 3000
+    }
+  ]
+}
