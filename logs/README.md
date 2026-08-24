@@ -29,7 +29,7 @@ protocolo Postgres-wire (8812). La API sí **lee** los logs por REST (9000).
 | **EC2** (Amazon Linux 2023) | Corre QuestDB en Docker (`user_data`) |
 | **EBS (gp3)** | Volumen persistente para los datos de logs |
 | **Elastic IP** | IP pública **fija** → va en `EC2_INSTANCE_IP` de la API |
-| **Security Group** | Abre 9000 (REST/web), 8812 (PG), 9009 (ILP) al CIDR permitido |
+| **Security Group** | Abre 9000 (REST/web) y 8812 (PG); 9009 (ILP) cerrado. Un CIDR por puerto, ver "Acceso por puerto" |
 | **SQS + DLQ** | Ingesta asíncrona de logs |
 | **Lambda consumidora** | Lee SQS y hace `INSERT` en la tabla `Logs` (PG-wire 8812) |
 
@@ -100,10 +100,50 @@ la **Elastic IP** de la EC2.
 - **Credenciales QuestDB:** por defecto `admin` / `quest` / db `qdb`
   (`questdb_pg_*` en las variables).
 - ⚠️ **Red:** la Lambda corre **fuera de VPC**, así que sale por IPs públicas
-  dinámicas de AWS y llega a QuestDB por su **IP pública**. Por eso el puerto 8812
-  del Security Group debe permitir ese tráfico. Con `allowed_cidr = ["0.0.0.0/0"]`
-  funciona; si lo restringes a la IP de la API, **la Lambda dejaría de conectar**
-  (habría que meterla en la VPC con NAT — fuera del alcance de este módulo).
+  dinámicas de AWS y llega a QuestDB por su **IP pública**. Por eso el 8812 tiene su
+  propia variable, `lambda_cidr`, y se queda en `0.0.0.0/0`: si lo restringes a la IP
+  de la API, **la Lambda dejaría de conectar** (habría que meterla en la VPC con NAT —
+  fuera del alcance de este módulo).
+
+## Acceso por puerto (Security Group)
+
+Los tres puertos tienen consumidores distintos, así que cada uno lleva su propia
+variable. **No se pueden restringir por igual.**
+
+| Puerto | Variable | Quién lo usa | Estado |
+|--------|----------|--------------|--------|
+| 9000 REST/consola | `api_cidr` | La API (lee logs, escribe `encryption_key_audit`) y tú desde el navegador | ⚠️ **abierto a internet** |
+| 8812 Postgres-wire | `lambda_cidr` | Solo la Lambda consumidora | abierto (obligado, ver arriba) |
+| 9009 ILP | `enable_ilp` | Nadie | cerrado (`false`) |
+
+### ⚠️ Pendiente: cerrar el 9000
+
+QuestDB OSS **no autentica el puerto 9000** — el RBAC es feature de Enterprise. Con
+`api_cidr = ["0.0.0.0/0"]`, cualquiera en internet puede abrir la consola web, leer
+la tabla `Logs` completa (user ids, acciones, target ids, paths) y ejecutar SQL
+arbitrario, `DROP TABLE` incluido. El CIDR es la única barrera que hay.
+
+Para cerrarlo hacen falta dos datos:
+
+1. **IPs de egress de Render** — dashboard → tu servicio → *Connect* → *Outbound IPs*
+2. **Tu IP pública** — `curl ifconfig.me` (para poder entrar a la consola)
+
+Y luego, en `terraform.tfvars`:
+
+```hcl
+api_cidr = [
+  "A.B.C.D/32",   # egress Render #1
+  "A.B.C.E/32",   # egress Render #2
+  "TU.IP.PUB/32", # tu máquina, para la consola web
+]
+```
+
+```bash
+terraform apply    # solo modifica el Security Group: no recrea la EC2 ni pierde datos
+```
+
+> Si el ISP te rota la IP pública, pierdes el acceso a la consola hasta reaplicar
+> con la nueva. Las IPs de egress estáticas de Render requieren plan de pago.
 
 ## Tablas de QuestDB (DDL)
 
@@ -150,8 +190,8 @@ pública. Implementado en `api/app/core/config.py` (`_discover_questdb_ip`).
   módulo, a diferencia de la rotación que cuesta centavos).
 - **Cuidado con `terraform destroy`:** elimina la EC2. Los datos sobreviven solo si
   el volumen EBS no se borra; considera *snapshots* (backup) antes de destruir.
-- **Restringe el acceso:** `allowed_cidr` debería ser la IP saliente de la API, no
-  `0.0.0.0/0`.
+- **Restringe el acceso:** ver "Acceso por puerto" abajo. Cada puerto tiene su
+  propia variable; no se pueden restringir por igual.
 
 ## Ciclo de vida: parar / eliminar / recrear
 

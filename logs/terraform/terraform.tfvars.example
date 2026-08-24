@@ -15,9 +15,37 @@ data_volume_size = 20            # GB para los datos de logs
 key_name         = ""            # nombre de tu key pair EC2 si quieres SSH
 
 # --- Acceso ---
-# ⚠️ En producción, restringe a la IP saliente de la API en Render, no 0.0.0.0/0
-allowed_cidr = ["0.0.0.0/0"]
-ssh_cidr     = ""                # ej: "TU.IP.PUBLICA/32" para abrir SSH solo a ti
+# ⚠️ PENDIENTE DE CERRAR — el 9000 sigue expuesto a todo internet.
+#
+# QuestDB OSS no autentica el puerto 9000 (el RBAC es feature de Enterprise), así
+# que este CIDR es la ÚNICA barrera. Con 0.0.0.0/0, cualquiera puede abrir la
+# consola web, leer la tabla Logs entera (user ids, acciones, target ids, paths)
+# y ejecutar SQL arbitrario, DROP TABLE incluido.
+#
+# Para cerrarlo hacen falta dos datos y reaplicar (solo toca el Security Group,
+# no recrea la instancia ni pierde datos):
+#
+#   1. IPs de egress de Render — dashboard → tu servicio → Connect → Outbound IPs
+#   2. Tu IP pública          — curl ifconfig.me   (para entrar a la consola)
+#
+# Queda así:
+#   api_cidr = [
+#     "A.B.C.D/32",   # egress Render #1
+#     "A.B.C.E/32",   # egress Render #2
+#     "TU.IP.PUB/32", # tu máquina, para la consola web
+#   ]
+#
+# Ojo: si el ISP te rota la IP, pierdes la consola hasta reaplicar con la nueva.
+api_cidr = ["0.0.0.0/0"]
+
+# 8812 (Postgres-wire): lo usa la Lambda consumidora, que corre FUERA de VPC y sale
+# por IPs públicas dinámicas de AWS. Restringir esto rompe la ingesta de logs.
+lambda_cidr = ["0.0.0.0/0"]
+
+# 9009 (ILP): ningún componente lo usa. Cerrado.
+enable_ilp = false
+
+ssh_cidr = ""                    # ej: "TU.IP.PUBLICA/32" para abrir SSH solo a ti
 
 # --- SQS ---
 sqs_visibility_timeout = 60      # debe ser >= consumer_timeout

@@ -27,7 +27,7 @@ data "aws_ami" "al2023" {
   owners      = ["amazon"]
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-2023.*-x86_64"] # 2023.* excluye las variantes minimal/ecs/neuron
   }
   filter {
     name   = "virtualization-type"
@@ -52,7 +52,7 @@ resource "aws_security_group" "questdb" {
     from_port   = 9000
     to_port     = 9000
     protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr
+    cidr_blocks = var.api_cidr
   }
 
   ingress {
@@ -60,15 +60,19 @@ resource "aws_security_group" "questdb" {
     from_port   = 8812
     to_port     = 8812
     protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr
+    cidr_blocks = var.lambda_cidr
   }
 
-  ingress {
-    description = "QuestDB ingest ILP"
-    from_port   = 9009
-    to_port     = 9009
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr
+  # ILP opcional (solo si enable_ilp = true)
+  dynamic "ingress" {
+    for_each = var.enable_ilp ? [1] : []
+    content {
+      description = "QuestDB ingest ILP"
+      from_port   = 9009
+      to_port     = 9009
+      protocol    = "tcp"
+      cidr_blocks = var.lambda_cidr
+    }
   }
 
   # SSH opcional (solo si se define ssh_cidr)

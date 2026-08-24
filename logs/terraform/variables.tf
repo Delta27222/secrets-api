@@ -64,10 +64,28 @@ variable "data_volume_size" {
 }
 
 # ---- Red / acceso ----
-variable "allowed_cidr" {
-  description = "CIDRs permitidos a los puertos de QuestDB. Idealmente la IP de la API, no 0.0.0.0/0"
+# Un CIDR por puerto: cada uno tiene un consumidor distinto y no se pueden
+# restringir por igual (ver el comentario de lambda_cidr).
+# ⚠️ QuestDB OSS no autentica el 9000 (el RBAC es de Enterprise): este CIDR es la
+# única barrera. Con 0.0.0.0/0 la consola web y /exec quedan abiertos a internet.
+# Para cerrarlo: IPs de egress de Render (dashboard → Connect → Outbound IPs) +
+# tu IP pública (curl ifconfig.me). Ver el comentario en terraform.tfvars.
+variable "api_cidr" {
+  description = "CIDRs permitidos al 9000 (REST + consola web). IPs de egress de Render + tu IP pública."
   type        = list(string)
-  default     = ["0.0.0.0/0"] # ⚠️ restringir en producción
+  default     = ["0.0.0.0/0"] # ⚠️ inseguro: pendiente de restringir
+}
+
+variable "lambda_cidr" {
+  description = "CIDRs permitidos al 8812 (Postgres-wire). La Lambda consumidora corre fuera de VPC, con IPs públicas dinámicas de AWS: restringir esto la desconecta."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "enable_ilp" {
+  description = "Abrir el 9009 (ingest ILP). Ningún componente del proyecto lo usa."
+  type        = bool
+  default     = false
 }
 
 variable "ssh_cidr" {
