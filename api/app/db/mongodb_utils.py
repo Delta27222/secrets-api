@@ -16,15 +16,19 @@ from ..core.config import (
     organization_members_collection_name,
 )
 from .mongodb import db
+from .mongo_monitoring import get_mongo_listeners
 
 logger = logging.getLogger(__name__)
 
 
 async def connect_to_mongo():
     logger.info("Start DB connection...")
+    # event_listeners: los fallos de comandos y los nodos que dejan de responder
+    # acaban en system_logs con source="mongo". Ver db/mongo_monitoring.py.
     db.client = AsyncIOMotorClient(str(MONGODB_URL),
                                    maxPoolSize=MAX_CONNECTIONS_COUNT,
-                                   minPoolSize=MIN_CONNECTIONS_COUNT)
+                                   minPoolSize=MIN_CONNECTIONS_COUNT,
+                                   event_listeners=get_mongo_listeners())
     logger.info("✅ DB connection created")
 
 
