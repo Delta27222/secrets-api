@@ -47,7 +47,7 @@ async def invite_to_organization(
                             detail="El usuario ya tiene una invitación pendiente o ya es parte de la organización")
     return await _create_invitation(current_user.id, db, organization_id, member.email, member.role)
 
-@create_service_logger("membership", "create_invitation", "organization")
+@create_service_logger("membership", "create_invitation", "organization") # 📦 DECORADOR QUE SE USA PARA LOGGEAR LAS ACCIONES DE LA API
 async def _create_invitation(target_id: str, db: AsyncIOMotorClient, organization_id: str, email: str, role: str) -> OrganizationMemberInResponse:
     return await create_invitation(db, organization_id, email, role)
 

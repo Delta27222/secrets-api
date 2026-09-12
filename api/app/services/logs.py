@@ -12,6 +12,7 @@ def _execute_log_query(
     user_id: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
+    level: Optional[str] = None,
 ) -> PaginatedLogsResponse:
     """Ejecución síncrona de queries a QuestDB. Llamar via run_in_executor."""
     query = get_log_query()
@@ -23,6 +24,8 @@ def _execute_log_query(
         query = query.by_target_type(target_type)
     if user_id:
         query = query.by_user(user_id)
+    if level:
+        query = query.by_level(level)
 
     total = query.count()
     if page < 1:
@@ -61,6 +64,7 @@ async def get_logs_by_filters(
     user_id: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
+    level: Optional[str] = None,
 ) -> PaginatedLogsResponse:
     """Wrapper async que ejecuta queries en thread pool."""
     loop = asyncio.get_running_loop()
@@ -73,10 +77,11 @@ async def get_logs_by_filters(
         user_id,
         page,
         per_page,
+        level,
     )
 
 
-async def get_all_logs(page: int = 1, per_page: int = 20) -> PaginatedLogsResponse:
+async def get_all_logs(page: int = 1, per_page: int = 20, level: Optional[str] = None) -> PaginatedLogsResponse:
     """Wrapper async que ejecuta queries en thread pool."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
@@ -88,4 +93,5 @@ async def get_all_logs(page: int = 1, per_page: int = 20) -> PaginatedLogsRespon
         None,  # user_id
         page,
         per_page,
+        level,
     )

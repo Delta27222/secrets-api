@@ -117,6 +117,17 @@ class LogQuery(QuestDBQuery):
     def by_action(self, action: str) -> "LogQuery":
         return self.where(action=action)
 
+    def by_level(self, level: str) -> "LogQuery":
+        """
+        Filtra por nivel. Las filas anteriores al cambio de esquema tienen level
+        nulo: se cuentan como INFO, que es lo que eran (solo se auditaban éxitos).
+        """
+        if str(level).upper() == "INFO":
+            self.where_conditions.append("(level = 'INFO' OR level IS NULL)")
+        else:
+            self.where_conditions.append(f"level = '{str(level).upper()}'")
+        return self
+
     def by_date_range(self, start_iso: str, end_iso: str) -> "LogQuery":
         return self.where_between("date", start_iso, end_iso)
 

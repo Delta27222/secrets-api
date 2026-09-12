@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from pydantic import BaseModel
-from sqlalchemy import String, Float, DateTime
+from sqlalchemy import String, Float, DateTime, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -23,6 +23,16 @@ class LogORM(Base):
     details: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     execution_time: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    # Resultado de la operación: null en los éxitos, poblado en los fallos.
+    level: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    status_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    error_type: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    # Contexto de la petición.
+    client_ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    method: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    request_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
 
 class LogModel(BaseModel):
@@ -61,6 +71,16 @@ class LogResponse(BaseModel):
     # QuestDB devuelve execution_time como DOUBLE (número). El front hace
     # parseFloat, así que un número sirve. Optional por si la fila viene sin él.
     execution_time: Optional[float] = None
+    # Nulos en las filas anteriores al cambio de esquema y en los éxitos, así que
+    # todos opcionales: el front tiene que tolerar su ausencia.
+    level: Optional[str] = None
+    status_code: Optional[int] = None
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
+    client_ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    method: Optional[str] = None
+    request_id: Optional[str] = None
 
     class Config:
         from_attributes = True
