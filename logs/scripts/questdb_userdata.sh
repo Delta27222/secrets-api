@@ -40,13 +40,42 @@ docker run -d --name questdb --restart unless-stopped \
 
 # 4. Crear las tablas de la aplicación (idempotente: CREATE TABLE IF NOT EXISTS).
 #    Espera a que QuestDB responda y luego ejecuta el DDL vía su API REST.
+#
+#    OJO: este archivo pasa por templatefile() de Terraform, que interpola las
+#    secuencias con dolar-llave. Las variables de shell van SIN llaves ($col), o
+#    Terraform intenta evaluarlas y el plan falla.
 for i in $(seq 1 30); do
   if curl -sf -o /dev/null "http://localhost:9000"; then break; fi
   sleep 3
 done
 
-curl -s -G "http://localhost:9000/exec" --data-urlencode \
-  "query=CREATE TABLE IF NOT EXISTS Logs (date TIMESTAMP, user STRING, action STRING, targetType STRING, idTarget STRING, details STRING, execution_time DOUBLE) TIMESTAMP(date) PARTITION BY DAY;"
+qdb() {
+  curl -s -G "http://localhost:9000/exec" --data-urlencode "query=$1"
+}
 
-curl -s -G "http://localhost:9000/exec" --data-urlencode \
-  "query=CREATE TABLE IF NOT EXISTS encryption_key_audit (timestamp TIMESTAMP, action STRING, key_id STRING, project_id STRING, actor_id STRING, ip_address STRING, operation_result STRING, details STRING) TIMESTAMP(timestamp) PARTITION BY DAY;"
+# Tabla Logs (auditoría). Registra la acción y SU RESULTADO: las cuatro últimas
+# columnas quedan null en los éxitos y se llenan cuando la operación falla.
+qdb "CREATE TABLE IF NOT EXISTS Logs (date TIMESTAMP, user STRING, action STRING, targetType STRING, idTarget STRING, details STRING, execution_time DOUBLE, level SYMBOL, status_code INT, error_type STRING, error_message STRING, client_ip STRING, user_agent STRING, method SYMBOL, request_id STRING) TIMESTAMP(date) PARTITION BY DAY;"
+
+# Upgrade de tablas preexistentes: si el EBS ya traía una tabla Logs con el
+# esquema viejo, el CREATE de arriba es un no-op y NO añade las columnas nuevas.
+# Estos ALTER las agregan; si ya existen, QuestDB devuelve error y se ignora.
+for col in "level SYMBOL" "status_code INT" "error_type STRING" "error_message STRING" \
+           "client_ip STRING" "user_agent STRING" "method SYMBOL" "request_id STRING"; do
+  qdb "ALTER TABLE Logs ADD COLUMN $col;" >/dev/null || true
+done
+
+# Tabla system_logs: fallos INTERNOS, los que no llegan a producir una respuesta
+# HTTP. Separada de Logs a propósito: Logs responde "quién hizo qué" y esta
+# responde "qué se rompió". Mezclarlas ensuciaría el timeline de auditoría.
+#   source     = system | mongo
+#   logger     = módulo de origen (app.services.environment, app.core.csfle...)
+#   request_id = cruza con la fila de Logs de la misma petición
+# Las tres de mongo van null en las filas de source=system.
+qdb "CREATE TABLE IF NOT EXISTS system_logs (date TIMESTAMP, level SYMBOL, source SYMBOL, logger STRING, message STRING, error_type STRING, operation STRING, collection STRING, duration_ms DOUBLE, request_id STRING) TIMESTAMP(date) PARTITION BY DAY;"
+
+for col in "operation STRING" "collection STRING" "duration_ms DOUBLE" "request_id STRING"; do
+  qdb "ALTER TABLE system_logs ADD COLUMN $col;" >/dev/null || true
+done
+
+qdb "CREATE TABLE IF NOT EXISTS encryption_key_audit (timestamp TIMESTAMP, action STRING, key_id STRING, project_id STRING, actor_id STRING, ip_address STRING, operation_result STRING, details STRING) TIMESTAMP(timestamp) PARTITION BY DAY;"
