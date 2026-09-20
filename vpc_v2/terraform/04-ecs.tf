@@ -89,7 +89,8 @@ resource "aws_ecs_task_definition" "api" {
         { name = "EC2_INSTANCE_PORT", value = "9000" },
         { name = "AWS_DEFAULT_REGION", value = var.aws_region },
         { name = "PYTHONUNBUFFERED", value = "1" },
-        { name = "PYTHONDONTWRITEBYTECODE", value = "1" }
+        { name = "PYTHONDONTWRITEBYTECODE", value = "1" },
+        { name = "GITHUB_ORG_NAME", value = var.github_org_name }
       ]
 
       secrets = [

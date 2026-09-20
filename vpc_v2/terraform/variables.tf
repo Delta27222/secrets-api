@@ -243,6 +243,12 @@ variable "github_client_secret" {
   sensitive   = true
 }
 
+variable "github_org_name" {
+  description = "Organizacion de GitHub requerida para login. Vacio = sin restriccion."
+  type        = string
+  default     = ""
+}
+
 variable "rotation_api_token" {
   description = "Token de servicio (tok_...) para que la Lambda worker autentique contra la API. Actualizar tras el primer deploy con un token real emitido por la API."
   type        = string
