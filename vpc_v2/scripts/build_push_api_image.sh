@@ -16,6 +16,9 @@ ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 IMAGE="${ECR_REGISTRY}/${ECR_REPO}:${TAG}"
 
 echo "[INFO] Autenticando en ECR..."
+# En macOS el credential helper de Docker Desktop falla si ya existe una
+# credencial para el registry en el Keychain (-25299); se limpia antes.
+docker logout "$ECR_REGISTRY" >/dev/null 2>&1 || true
 aws ecr get-login-password --region "$REGION" | \
   docker login --username AWS --password-stdin "$ECR_REGISTRY"
 

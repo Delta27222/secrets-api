@@ -20,7 +20,10 @@ resource "null_resource" "ecr_login" {
   }
 
   provisioner "local-exec" {
-    command = "aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${local.ecr_registry}"
+    # docker logout antes: el helper de credenciales de macOS (osxkeychain/desktop)
+    # choca con "The specified item already exists in the keychain" si ya queda
+    # una entrada de un apply anterior — logout la limpia antes de escribir la nueva.
+    command = "docker logout ${local.ecr_registry} >/dev/null 2>&1; aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${local.ecr_registry}"
   }
 }
 
