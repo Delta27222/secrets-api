@@ -235,10 +235,67 @@ usuario note nada.
    → aparece el evento de rotación recién hecho, con fecha y proyecto.
 
 ### Qué decir
-- Cifrado a nivel de campo (CSFLE de MongoDB) con una llave por proyecto.
+- Cifrado en capas (*envelope encryption*) con **una llave por proyecto**,
+  protegida a su vez por **CSFLE de MongoDB** (explicado abajo).
 - Las credenciales de Render/Vercel guardadas en un ambiente usan **la misma
   llave**: rotarla también protege esas credenciales.
 - Cada rotación queda versionada y auditada.
+
+### ¿Qué es CSFLE?
+
+**CSFLE** = *Client-Side Field Level Encryption* (cifrado a nivel de campo del
+lado del cliente). Es una funcionalidad oficial de MongoDB:
+
+- **Client-Side (del lado del cliente):** el cifrado lo hace el **driver de
+  MongoDB dentro de la API** (el "cliente" de la base), **antes** de enviar el
+  dato. MongoDB recibe y guarda solo bytes cifrados, y nunca ve el valor real.
+- **Field Level (a nivel de campo):** no se cifra la base entera ni el disco,
+  sino **campos específicos** de un documento. El resto del documento (IDs,
+  fechas, versión) queda legible para poder consultarlo.
+- **Algoritmo:** `AEAD_AES_256_CBC_HMAC_SHA_512` en modo *Random*: AES de 256
+  bits para la confidencialidad, más HMAC-SHA-512 para detectar si alguien
+  alteró el dato. En modo *Random*, el mismo valor cifrado dos veces da
+  resultados distintos, así que no se puede adivinar comparando.
+
+**Por qué importa:** si alguien obtiene acceso a la base de datos (un backup
+robado, un admin de la base, un volcado de disco), solo ve datos cifrados.
+Para descifrar hace falta la llave maestra, que **no está en MongoDB**.
+
+### Cómo se usa en Tek Secrets: tres capas de llaves
+
+```
+Llave maestra (AWS Secrets Manager, fuera de MongoDB)
+   └─ protege → DEK de CSFLE        (colección encryption_db.key_vault)
+        └─ protege, con CSFLE → llave de cada proyecto   (colección encryption_keys)
+             └─ cifra → los secretos del proyecto y las credenciales de Render/Vercel
+```
+
+| Capa | Qué es | Dónde vive |
+|---|---|---|
+| 1. Llave maestra | Llave raíz (`MONGODB_CSFLE_MASTER_KEY`) | AWS Secrets Manager; ECS la inyecta a la API al arrancar |
+| 2. DEK (*Data Encryption Key*) | Llave de datos de CSFLE, cifrada con la maestra | `encryption_db.key_vault` en MongoDB |
+| 3. Llave del proyecto | Una llave (Fernet) por proyecto, con versiones. Su material se guarda **cifrado con CSFLE** | `encryption_keys` en MongoDB |
+| 4. Secretos | Valores de las variables, cifrados con la llave del proyecto | `environments` en MongoDB |
+
+A esto se le llama ***envelope encryption*** (cifrado en sobre): cada llave
+está "metida en un sobre" cifrado por la llave de la capa superior.
+
+**Ventajas que conviene mencionar:**
+- **Rotar es barato:** rotar la llave de un proyecto solo vuelve a cifrar los
+  secretos de **ese** proyecto. Los demás no se tocan.
+- **Aislamiento entre proyectos:** si se compromete la llave de un proyecto,
+  los otros siguen protegidos.
+- **Separación de dónde vive cada cosa:** la llave maestra está en AWS Secrets
+  Manager y los datos en MongoDB. Robar solo uno de los dos no alcanza.
+
+**Evidencia en vivo** (en `mongosh`, sin mostrar material sensible):
+```js
+// Las llaves de proyecto: el campo key_material aparece como Binary (cifrado con CSFLE)
+db.encryption_keys.findOne({}, { project_id: 1, version: 1, key_material: 1 })
+
+// La DEK de CSFLE vive en otra base, también cifrada (con la llave maestra)
+db.getSiblingDB("encryption_db").key_vault.countDocuments()
+```
 
 ---
 
@@ -303,6 +360,38 @@ usa la cuenta de una persona. Usa un **service token** con permisos mínimos
 mano. Con un token y el ID del ambiente, **lee sus variables en tiempo de
 ejecución** desde Tek Secrets.
 
+### Cómo se distribuye: paquete privado en GitHub Packages
+
+El SDK no se copia a mano entre proyectos: se publica como **paquete npm
+privado** en GitHub Packages, y cualquier app Node.js de la empresa lo instala
+con `npm install`, igual que una librería pública.
+
+| Pieza | Configuración | Para qué |
+|---|---|---|
+| Repositorio | Repo privado `secrets-27222633/tek-secrets-sdk` | Código fuente del SDK |
+| Nombre del paquete | `@secrets-27222633/sdk` | El scope **tiene que coincidir** con el dueño del repo; GitHub lo usa para saber a qué cuenta pertenece el paquete y quién puede publicarlo |
+| Registro | `publishConfig.registry = https://npm.pkg.github.com` en `package.json` | `npm publish` sube a GitHub Packages, **no** al npm público |
+| Credencial | Personal Access Token de GitHub con `read:packages` / `write:packages`, guardado en un `.npmrc` local (en `.gitignore`) | Solo quien tiene el token puede publicar o instalar |
+| Publicación | `npm publish`; el script `prepublishOnly` compila (`npm run build`) antes de subir | Siempre se publica el `dist/` actualizado |
+| Versiones | `0.1.0` y `0.1.1` | Versionado semántico; las apps fijan la versión que usan |
+
+**Para consumirlo** (así está instalado en el front), el proyecto lleva un
+`.npmrc` que apunta el scope al registro de GitHub:
+
+```
+@secrets-27222633:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+El token **no está escrito en el archivo**: se lee de la variable de entorno
+`GITHUB_TOKEN` (con permiso `read:packages`), así que el `.npmrc` sí se puede
+commitear. En CI/CD se configura como *secret* de la plataforma.
+
+**Qué decir:** el mismo principio de mínimo privilegio del objetivo 3 se
+aplica a la distribución. Ser privado significa que **solo quien tiene un
+token autorizado puede descargar el SDK**, y el token para instalar
+(`read:packages`) es distinto del token para publicar (`write:packages`).
+
 ### Pasos
 
 1. App → https://app.secretsapi.online/sdk-demo. Recorrer las pestañas:
@@ -335,6 +424,60 @@ ejecución** desde Tek Secrets.
 - Resiliencia: caché, reintentos con backoff, stale-on-error.
 - Los permisos los controla el token (objetivo 3): el SDK no puede leer más de
   lo que su token permite.
+
+### ¿Por qué el SDK es más seguro que una consulta o un servicio propio?
+
+Hay tres formas de que una app obtenga sus variables. El SDK es la que menos
+expone:
+
+| | Consulta directa a MongoDB | Servicio propio que trae las envs | **SDK de Tek Secrets** |
+|---|---|---|---|
+| Qué credencial guarda la app | Usuario y password de **la base completa** y la **llave maestra** para descifrar | Depende de cada implementación | Solo un **token de lectura**, acotado a un ambiente y revocable |
+| Si esa credencial se filtra | El atacante lee **todos los secretos de todos los proyectos** y puede modificarlos | Variable | Lee **solo las variables de ese ambiente**. Se revoca en un click y deja de servir al instante |
+| Permisos | Todo o nada | Lo que cada equipo programe | Scopes (`secrets:read`) validados por la API |
+| Auditoría | Ninguna: la base no sabe qué app leyó qué | Solo si se programa | Cada lectura pasa por la API y queda asociada a un token (último uso) |
+| Dependencias de terceros | Driver de MongoDB y sus dependencias | Las que use cada equipo | **Ninguna** |
+
+**1. Cero dependencias = menos superficie de ataque (cadena de suministro).**
+Cada paquete de npm que instala una app es código de terceros que corre con
+acceso a sus secretos. Ya hubo ataques reales en que una librería popular fue
+comprometida para robar credenciales, como `event-stream` (2018) y
+`ua-parser-js` (2021). Una librería que maneja secretos es un blanco
+especialmente atractivo. El SDK no instala **ningún** paquete adicional: solo
+usa `fetch`, que viene con Node. Así no hay dependencias transitivas que
+puedan ser comprometidas, ni scripts `postinstall` que se ejecuten al
+instalar, y el código a auditar es solo el del SDK.
+
+**2. La app nunca toca la base de datos ni las llaves.**
+Con una consulta directa, cada app necesitaría la conexión a MongoDB **y** la
+llave maestra para descifrar (ver CSFLE en el objetivo 2). Sería repartir las
+llaves del reino en cada servidor. Con el SDK, el descifrado ocurre **solo
+dentro de la API**: la app recibe los valores ya descifrados por HTTPS y nunca
+conoce cómo están guardados ni con qué llave.
+
+**3. Mínimo privilegio y revocación inmediata.**
+El token del SDK solo puede **leer** y solo los ambientes que se le asignaron
+(demostrado con el 403 del objetivo 3). Si se compromete un servidor, se
+revoca su token y listo, sin cambiar passwords de la base ni rotar la llave
+maestra.
+
+**4. Una sola implementación revisada, en vez de una por equipo.**
+Un servicio casero repetido en cada equipo multiplica los errores posibles:
+imprimir el token en los logs, guardar las variables en un archivo en disco,
+no manejar los errores. El SDK lo resuelve una vez y bien:
+- El token solo viaja en el header `Authorization` y **no se imprime nunca**:
+  el SDK no escribe logs.
+- La caché vive **solo en memoria**. Nada se escribe en disco, así que no
+  quedan archivos `.env` olvidados en el servidor.
+- `load()` **no sobrescribe** variables que ya existen en `process.env`, salvo
+  que se pida explícitamente (`override: true`).
+- Los errores son tipados (`AuthenticationError`, `PermissionError`…) y no
+  incluyen el token.
+
+**5. Trazabilidad.**
+Toda lectura pasa por la API, que sabe qué token pidió qué ambiente y cuándo
+fue su último uso. Con una consulta directa a la base esa información no
+existe.
 
 ---
 
