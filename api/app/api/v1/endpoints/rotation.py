@@ -25,6 +25,7 @@ from ....core.service_auth import Scope, require_scope
 from ....models.service_token import ServiceTokenInDB
 from ....services.encryption_keys import get_key_manager
 from ....services.secret_encryption import encrypt_secrets, decrypt_secrets
+from ....services.environment import reencrypt_integration_fields
 
 logger = logging.getLogger(__name__)
 
@@ -81,13 +82,17 @@ async def rotate_project_encryption(
             # Re-encriptar con la llave nueva activa
             encrypted, metadata = await encrypt_secrets(db, decrypted, project_id)
 
-            # Actualizar environment: secrets + metadata
+            # Re-encriptar credenciales de Render/Vercel (si no, quedan con la llave vieja)
+            integration_fields = await reencrypt_integration_fields(db, env)
+
+            # Actualizar environment: secrets + metadata + credenciales de integraciones
             await conn_db[environments_collection_name].update_one(
                 {"_id": env["_id"]},
                 {
                     "$set": {
                         "secrets": encrypted,
                         "secrets_encryption": metadata,
+                        **integration_fields,
                         "updated_at": datetime.utcnow(),
                     }
                 },
