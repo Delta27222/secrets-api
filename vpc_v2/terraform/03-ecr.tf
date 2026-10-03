@@ -56,6 +56,43 @@ resource "aws_ecr_lifecycle_policy" "api" {
   })
 }
 
+resource "aws_ecr_repository" "front" {
+  name                 = "${var.project_name}-front"
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  tags = { Name = "${var.project_name}-front-ecr" }
+}
+
+# IMMUTABLE (a diferencia de api/questdb/mongodb): cada deploy de GitHub
+# Actions etiqueta con el git SHA (ver Q7 — rollback = apuntar a una
+# revision de task definition anterior, que referencia un tag que nunca
+# se sobreescribe).
+resource "aws_ecr_lifecycle_policy" "front" {
+  repository = aws_ecr_repository.front.name
+
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Conservar solo las ultimas 10 imagenes etiquetadas"
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 10
+      }
+      action = { type = "expire" }
+    }]
+  })
+}
+
 resource "aws_ecr_repository" "questdb" {
   name                 = "${var.project_name}-questdb"
   image_tag_mutability = "MUTABLE"
@@ -141,7 +178,7 @@ resource "aws_iam_role_policy" "ecs_execution_ecr" {
       {
         Effect   = "Allow"
         Action   = ["ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"]
-        Resource = aws_ecr_repository.api.arn
+        Resource = [aws_ecr_repository.api.arn, aws_ecr_repository.front.arn]
       }
     ]
   })

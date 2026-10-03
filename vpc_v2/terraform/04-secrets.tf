@@ -85,3 +85,32 @@ resource "aws_secretsmanager_secret_version" "github_client_secret" {
   secret_id     = aws_secretsmanager_secret.github_client_secret.id
   secret_string = var.github_client_secret
 }
+
+# Firma las cookies/JWT de NextAuth en el front. Igual que secret_key y
+# csfle_master_key: ambiente nuevo, se genera solo, sin nada que migrar.
+resource "random_password" "nextauth_secret" {
+  length  = 64
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "sdk_demo_token" {
+  name                    = "${var.project_name}/sdk-demo-token"
+  recovery_window_in_days = 0
+  tags                    = { Name = "${var.project_name}-secret-sdk-demo-token" }
+}
+
+resource "aws_secretsmanager_secret_version" "sdk_demo_token" {
+  secret_id     = aws_secretsmanager_secret.sdk_demo_token.id
+  secret_string = var.sdk_demo_token
+}
+
+resource "aws_secretsmanager_secret" "nextauth_secret" {
+  name                    = "${var.project_name}/nextauth-secret"
+  recovery_window_in_days = 0
+  tags                    = { Name = "${var.project_name}-secret-nextauth-secret" }
+}
+
+resource "aws_secretsmanager_secret_version" "nextauth_secret" {
+  secret_id     = aws_secretsmanager_secret.nextauth_secret.id
+  secret_string = random_password.nextauth_secret.result
+}

@@ -15,9 +15,12 @@ locals {
   rotation_master_zip = "${path.module}/../../rotation/terraform/lambda_master.zip"
   rotation_worker_zip = "${path.module}/../../rotation/terraform/lambda_worker.zip"
 
+  # El apex (var.domain_name pelado) NO llega al ALB — va por domain
+  # forwarding de GoDaddy hacia app.* (ver Q9) y el cert wildcard tampoco
+  # lo cubre. La API vive en el subdominio api.*.
   api_base_url = (
-    var.domain_name != "" ? "https://${var.domain_name}" :
-    var.acm_certificate_arn != "" ? "https://${aws_lb.main.dns_name}" :
+    var.domain_name != "" ? "https://api.${var.domain_name}" :
+    local.effective_cert_arn != "" ? "https://${aws_lb.main.dns_name}" :
     "http://${aws_lb.main.dns_name}"
   )
 }

@@ -44,15 +44,44 @@ resource "aws_lb_target_group" "api" {
   tags = { Name = "${var.project_name}-tg-api" }
 }
 
+resource "aws_lb_target_group" "front" {
+  name        = "${var.project_name}-tg-front"
+  port        = 3000
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    path                = "/"
+    protocol            = "HTTP"
+    port                = "traffic-port"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 10
+    interval            = 30
+    # Next.js puede responder con un redirect (ej. a /auth/signin) en la
+    # raiz sin sesion — 200-399 evita falsos "unhealthy" por eso.
+    matcher = "200-399"
+  }
+
+  deregistration_delay = 30
+
+  tags = { Name = "${var.project_name}-tg-front" }
+}
+
 resource "aws_lb_listener" "https" {
-  count = var.acm_certificate_arn != "" ? 1 : 0
+  count = local.want_https ? 1 : 0
 
   load_balancer_arn = aws_lb.main.arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = var.acm_certificate_arn
+  certificate_arn   = local.effective_cert_arn
 
+  # Sin reglas de host (ver mas abajo), el default sigue siendo la API —
+  # asi ALB DNS name pelado (sin dominio) mantiene el comportamiento de
+  # antes.
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.api.arn
@@ -61,16 +90,57 @@ resource "aws_lb_listener" "https" {
   tags = { Name = "${var.project_name}-listener-https" }
 }
 
+# Host-based routing — solo tiene sentido con dominio propio configurado.
+resource "aws_lb_listener_rule" "front_host" {
+  count = var.domain_name != "" ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 10
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.front.arn
+  }
+
+  condition {
+    host_header {
+      values = ["app.${var.domain_name}"]
+    }
+  }
+
+  tags = { Name = "${var.project_name}-rule-front" }
+}
+
+resource "aws_lb_listener_rule" "api_host" {
+  count = var.domain_name != "" ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    host_header {
+      values = ["api.${var.domain_name}"]
+    }
+  }
+
+  tags = { Name = "${var.project_name}-rule-api" }
+}
+
 resource "aws_lb_listener" "http_redirect" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type = var.acm_certificate_arn != "" ? "redirect" : "forward"
+    type = local.want_https ? "redirect" : "forward"
 
     dynamic "redirect" {
-      for_each = var.acm_certificate_arn != "" ? [1] : []
+      for_each = local.want_https ? [1] : []
       content {
         port        = "443"
         protocol    = "HTTPS"
@@ -79,7 +149,7 @@ resource "aws_lb_listener" "http_redirect" {
     }
 
     dynamic "forward" {
-      for_each = var.acm_certificate_arn == "" ? [1] : []
+      for_each = local.want_https ? [] : [1]
       content {
         target_group {
           arn = aws_lb_target_group.api.arn

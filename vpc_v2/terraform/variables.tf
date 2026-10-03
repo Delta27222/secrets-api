@@ -230,6 +230,38 @@ variable "ecs_max_count" {
   default     = 2
 }
 
+# ---- Grupo 4: Front (Next.js) ----
+
+variable "front_image_tag" {
+  description = "Tag inicial de la imagen del front en ECR. GitHub Actions registra revisiones nuevas de la task definition en cada deploy; Terraform no debe pisarlas (ver lifecycle.ignore_changes en aws_ecs_service.front)."
+  type        = string
+  default     = "latest"
+}
+
+variable "front_task_cpu" {
+  description = "CPU de la tarea ECS del front (256 = 0.25 vCPU)"
+  type        = number
+  default     = 256
+}
+
+variable "front_task_memory" {
+  description = "Memoria de la tarea ECS del front en MB"
+  type        = number
+  default     = 512
+}
+
+variable "front_desired_count" {
+  description = "Numero deseado de tareas ECS del front en ejecucion"
+  type        = number
+  default     = 1
+}
+
+variable "github_repo_front" {
+  description = "Repo GitHub del front en formato org/repo, para el trust policy del rol OIDC de GitHub Actions"
+  type        = string
+  default     = "Delta27222/secrets-app"
+}
+
 variable "github_client_id" {
   description = "GitHub OAuth App Client ID. Login falla hasta que se configure un valor real (Secrets Manager rechaza string vacio)."
   type        = string
@@ -254,6 +286,19 @@ variable "rotation_api_token" {
   type        = string
   default     = "tok_placeholder_update_after_deploy"
   sensitive   = true
+}
+
+variable "sdk_demo_token" {
+  description = "Token de servicio (tok_...) para la demo del SDK (/sdk-demo del front). Actualizar tras el primer deploy con un token real emitido por la API."
+  type        = string
+  default     = "tok_placeholder_update_after_deploy"
+  sensitive   = true
+}
+
+variable "sdk_demo_environment_id" {
+  description = "Environment ID default precargado en la demo del SDK (/sdk-demo del front)."
+  type        = string
+  default     = ""
 }
 
 variable "rotation_interval_days" {

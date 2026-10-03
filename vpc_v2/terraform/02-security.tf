@@ -31,7 +31,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs" {
   name        = "${var.project_name}-sg-ecs"
-  description = "ECS tasks: acepta del ALB en :8000, sale a QuestDB, MongoDB y servicios AWS"
+  description = "ECS tasks (api + front): acepta del ALB en :8000/:3000, Service Connect interno en :8000, sale a QuestDB, MongoDB y servicios AWS"
   vpc_id      = aws_vpc.main.id
 
   tags = { Name = "${var.project_name}-sg-ecs" }
@@ -207,6 +207,53 @@ resource "aws_security_group_rule" "ecs_ingress_from_alb" {
   description              = "Trafico de la API desde el ALB"
 }
 
+resource "aws_security_group_rule" "alb_egress_to_front" {
+  type                     = "egress"
+  security_group_id        = aws_security_group.alb.id
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ecs.id
+  description              = "Health checks y trafico hacia el front (Next.js)"
+}
+
+resource "aws_security_group_rule" "ecs_ingress_from_alb_front" {
+  type                     = "ingress"
+  security_group_id        = aws_security_group.ecs.id
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb.id
+  description              = "Trafico del front desde el ALB"
+}
+
+# Front y api comparten este SG (ambos son "ECS tasks en subred privada de
+# apps"). Self-referencing en vez de una regla cross-SG: cualquier task del
+# SG puede llamar a cualquier otra en :8000 — cubre front -> api via
+# Service Connect sin exponer nada mas.
+resource "aws_security_group_rule" "ecs_ingress_self_service_connect" {
+  type              = "ingress"
+  security_group_id = aws_security_group.ecs.id
+  from_port         = 8000
+  to_port           = 8000
+  protocol          = "tcp"
+  self              = true
+  description       = "Service Connect: front a api, interno, sin pasar por el ALB"
+}
+
+# Contraparte de salida: sin esta regla el proxy de Service Connect del front
+# no puede abrir conexion a la api (el egress del SG no es abierto) y el
+# front recibe ECONNRESET en toda llamada a http://api:8000.
+resource "aws_security_group_rule" "ecs_egress_self_service_connect" {
+  type              = "egress"
+  security_group_id = aws_security_group.ecs.id
+  from_port         = 8000
+  to_port           = 8000
+  protocol          = "tcp"
+  self              = true
+  description       = "Service Connect: front a api, interno, sin pasar por el ALB"
+}
+
 resource "aws_security_group_rule" "ecs_egress_to_questdb" {
   type                     = "egress"
   security_group_id        = aws_security_group.ecs.id
@@ -323,6 +370,9 @@ locals {
     { rule_number = 110, protocol = "tcp", cidr_block = var.subnet_private_b_cidr, from_port = 8000, to_port = 8000 },
     { rule_number = 120, protocol = "tcp", cidr_block = "0.0.0.0/0", from_port = 443, to_port = 443 },
     { rule_number = 130, protocol = "tcp", cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535 },
+    # ALB -> front (Next.js), mismo esquema que el 8000 de arriba pero 3000.
+    { rule_number = 135, protocol = "tcp", cidr_block = var.subnet_private_a_cidr, from_port = 3000, to_port = 3000 },
+    { rule_number = 136, protocol = "tcp", cidr_block = var.subnet_private_b_cidr, from_port = 3000, to_port = 3000 },
   ]
 
   nacl_private_apps_ingress = [
@@ -339,6 +389,14 @@ locals {
     # Lambda y el Arbiter de Mongo (en apps-b) se quedan sin ECR ni SSM.
     { rule_number = 145, protocol = "tcp", cidr_block = var.subnet_private_a_cidr, from_port = 443, to_port = 443 },
     { rule_number = 146, protocol = "tcp", cidr_block = var.subnet_private_b_cidr, from_port = 443, to_port = 443 },
+    # ALB -> front (Next.js) en :3000.
+    { rule_number = 150, protocol = "tcp", cidr_block = var.subnet_public_a_cidr, from_port = 3000, to_port = 3000 },
+    { rule_number = 151, protocol = "tcp", cidr_block = var.subnet_public_b_cidr, from_port = 3000, to_port = 3000 },
+    # Service Connect: front llama a api en :8000 sin pasar por el ALB.
+    # Front y api viven en el mismo tier (private-apps), asi que la NACL
+    # compartida necesita permitir el trafico entre sus propias subredes.
+    { rule_number = 155, protocol = "tcp", cidr_block = var.subnet_private_a_cidr, from_port = 8000, to_port = 8000 },
+    { rule_number = 156, protocol = "tcp", cidr_block = var.subnet_private_b_cidr, from_port = 8000, to_port = 8000 },
   ]
   nacl_private_apps_egress = [
     { rule_number = 100, protocol = "tcp", cidr_block = "0.0.0.0/0", from_port = 443, to_port = 443 },
@@ -357,6 +415,10 @@ locals {
     # fallar el pull de ECR y colgar los comandos SSM del Arbiter.
     { rule_number = 171, protocol = "tcp", cidr_block = var.subnet_private_a_cidr, from_port = 1024, to_port = 65535 },
     { rule_number = 172, protocol = "tcp", cidr_block = var.subnet_private_b_cidr, from_port = 1024, to_port = 65535 },
+    # Service Connect: front necesita SALIR hacia api en :8000 (misma
+    # razon que el ingress 155/156 de arriba — comparten NACL).
+    { rule_number = 175, protocol = "tcp", cidr_block = var.subnet_private_a_cidr, from_port = 8000, to_port = 8000 },
+    { rule_number = 176, protocol = "tcp", cidr_block = var.subnet_private_b_cidr, from_port = 8000, to_port = 8000 },
   ]
 
   nacl_private_data_ingress = [

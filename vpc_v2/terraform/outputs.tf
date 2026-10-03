@@ -138,3 +138,41 @@ output "lambda_function_names" {
     rotation_worker = aws_lambda_function.rotation_worker.function_name
   }
 }
+
+# ============================================================================
+# Front + dominio propio
+# ============================================================================
+
+output "front_ecr_repository_url" {
+  value = aws_ecr_repository.front.repository_url
+}
+
+output "front_service_name" {
+  value = aws_ecs_service.front.name
+}
+
+output "github_actions_role_arn" {
+  description = "role-to-assume del workflow de GitHub Actions del front (aws-actions/configure-aws-credentials)"
+  value       = aws_iam_role.github_actions_front.arn
+}
+
+output "acm_validation_records" {
+  description = "Si no aparece: falta var.domain_name. Pegar este CNAME en GoDaddy para validar el certificado."
+  value = var.domain_name != "" ? {
+    name  = tolist(aws_acm_certificate.main[0].domain_validation_options)[0].resource_record_name
+    type  = tolist(aws_acm_certificate.main[0].domain_validation_options)[0].resource_record_type
+    value = tolist(aws_acm_certificate.main[0].domain_validation_options)[0].resource_record_value
+  } : null
+}
+
+output "dns_records_needed" {
+  description = "CNAMEs a crear en GoDaddy una vez que el certificado valide"
+  value = var.domain_name != "" ? {
+    app = { name = "app.${var.domain_name}", type = "CNAME", value = aws_lb.main.dns_name }
+    api = { name = "api.${var.domain_name}", type = "CNAME", value = aws_lb.main.dns_name }
+  } : null
+}
+
+output "app_url" {
+  value = var.domain_name != "" ? "https://app.${var.domain_name}" : null
+}
