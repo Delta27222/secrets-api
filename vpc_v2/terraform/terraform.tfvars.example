@@ -1,0 +1,25 @@
+# Copia a terraform.tfvars y ajusta si hace falta.
+# Se va ampliando por grupo conforme se construye vpc_v2.
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+vpc_cidr                   = "10.0.0.0/16"
+subnet_public_a_cidr       = "10.0.1.0/24"
+subnet_public_b_cidr       = "10.0.2.0/24"
+subnet_private_a_cidr      = "10.0.3.0/24"
+subnet_private_b_cidr      = "10.0.4.0/24"
+subnet_private_data_a_cidr = "10.0.5.0/24"
+subnet_private_data_b_cidr = "10.0.6.0/24"
+
+# ---- Grupo 3: QuestDB / MongoDB — genera con: openssl rand -base64 24 ----
+questdb_pg_password     = "CAMBIA_ESTO"
+mongodb_admin_password  = "CAMBIA_ESTO"
+
+github_client_id     = "<mismo valor que GITHUB_CLIENT_ID en api/.env>"
+github_client_secret = "<mismo valor que GITHUB_CLIENT_SECRET en api/.env>"
+github_org_name = "<mismo valor que GITHUB_ORG_NAME en api/.env>"
+
+# ---- Grupo 4: Dominio + front ----
+# Vacio = sin HTTPS ni front por dominio propio (ALB queda solo en HTTP directo a la API).
+domain_name = "tudominio.com"

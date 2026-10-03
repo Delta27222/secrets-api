@@ -30,6 +30,9 @@ MONGO_DB = os.getenv("MONGO_DB", "secrets-27222")
 MONGODB_URL = os.getenv("MONGODB_URL", "")
 
 # Deployments
+# Render API docs:  https://api-docs.render.com/reference/update-environment-variables-for-service
+# Vercel API docs:  https://vercel.com/docs/rest-api/reference/endpoints/projects/create-one-or-more-environment-variables
+# Ver README_RECORRIDO_SYNC.md (raíz del repo) para el flujo completo de sync.
 RENDER_API_URL = os.getenv("RENDER_API_URL", "https://api.render.com/v1")
 VERCEL_API_URL = os.getenv("VERCEL_API_URL", "https://api.vercel.com/v10/projects")
 
