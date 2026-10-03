@@ -267,6 +267,84 @@ funcione contra la API desplegada, copia los valores reales del `.env.local`
 del frontend a `terraform.tfvars` y corre `terraform apply` (ver tabla de
 abajo).
 
+### 10. Front dentro de la VPC (ECS Fargate + dominio propio)
+
+El front (`secrets-app`) ya no va en Render — corre como servicio ECS
+Fargate propio, en las mismas subredes privadas que la API (ambas AZ),
+detrás del mismo ALB (host-based routing: `app.` / `api.`) y hablándole a
+la API por Service Connect (interno, sin salir de la VPC). Dominio:
+`secretsapi.online`, DNS en GoDaddy, cert ACM wildcard, deploy del front
+vía GitHub Actions con OIDC, un solo ambiente (sin staging replicado).
+
+### 10.1 Qué sobrevive a un `destroy` y qué no
+
+Esto importa porque cambia qué pasos hay que repetir cada vez que se
+destruye y se vuelve a levantar (ej. para no pagar de más — ver sección de
+costos más abajo si existe, o la conversación que armó esto).
+
+**Sobrevive** (no hay que tocarlo de nuevo):
+- GitHub OAuth App (Client ID/Secret, Redirect URI) — vive en GitHub, ajeno a AWS.
+- Secrets de GitHub Actions en `secrets-app` (`AWS_GITHUB_ACTIONS_ROLE_ARN`, `GH_PACKAGES_TOKEN`) — el ARN del rol IAM es determinístico (mismo nombre de rol = mismo ARN aunque Terraform lo recree), y el token de packages es ajeno a AWS.
+- `github_client_id`/`secret`/`org_name`, contraseñas de Mongo/QuestDB en `terraform.tfvars` — son inputs, no outputs.
+- El código: Dockerfile, `next.config.mjs` (`output: standalone`), `.github/workflows/deploy.yml`, el healthcheck (`wget` a `127.0.0.1`) — todo ya commiteado.
+
+**NO sobrevive** (Terraform lo recrea con valores nuevos, hay que re-tomarlos):
+- **DNS name del ALB** (cambia — es un recurso nuevo con nombre asignado por AWS). Los CNAME `app.`/`api.` en GoDaddy hay que **editarlos** (no agregar nuevos) con el valor nuevo de `terraform output dns_records_needed`.
+- **Certificado ACM + su CNAME de validación** (cert nuevo cada vez → hash de validación nuevo). Hay que repetir el paso de pegar el CNAME en GoDaddy con el valor nuevo de `terraform output acm_validation_records`. El CNAME viejo en GoDaddy queda huérfano — no rompe nada si lo dejás, pero se puede borrar.
+- Datos: Mongo, QuestDB, y los secrets generados solos (`SECRET_KEY`, `CSFLE_MASTER_KEY`, `NEXTAUTH_SECRET`) — todo nuevo, sin nada que migrar (es el diseño: "ambiente nuevo").
+- El repo ECR del front queda vacío — el servicio arranca con 0 tasks sanas hasta el primer deploy de GitHub Actions.
+
+### 10.2 Runbook completo — de cero a andando
+
+1. **`terraform apply`** en `vpc_v2/terraform`. Tarda ~15-20 min (EC2, NAT, ECS, Lambdas). Si salta `Create service is not idempotent` (ECS tarda unos minutos en liberar el nombre de un service recién borrado) o `ResourceAlreadyExistsException` en un log group huérfano, ver 10.4 — no son bugs, se resuelven solos o con un `import`.
+
+2. **Validar el cert ACM**: `terraform output acm_validation_records` → pegar ese CNAME en **GoDaddy → secretsapi.online → DNS → DNS Records → Add New Record** (nuevo registro, no editar uno viejo).
+
+   ⚠️ Campo **Name**: SOLO el prefijo (ej. `_10b92720a119190a81bfce277414aede`), **sin** `.secretsapi.online` al final — GoDaddy concatena el dominio solo.
+
+   ⚠️ Lápiz = editar el registro de esa fila, no crear uno nuevo. Usá "Add New Record" para uno nuevo.
+
+   ⚠️ Si `dig` da `NXDOMAIN` justo después de guardar, puede ser caché negativo del SOA de GoDaddy (600s en resolvers tipo 8.8.8.8). Confirmá sin caché contra el nameserver autoritativo:
+   ```bash
+   dig CNAME <nombre-del-record>.secretsapi.online @ns17.domaincontrol.com
+   ```
+   El apply se queda esperando (timeout 45m) hasta que el cert valide — no hace falta reiniciarlo, solo esperar a que ACM re-chequee (poll periódico, no instantáneo, puede tardar 5-15 min extra después de que el DNS ya esté bien).
+
+3. **CNAMEs de app/api**: `terraform output dns_records_needed` → en GoDaddy, **editá** (o creá si es la primera vez) los CNAME `app` y `api` con el DNS name nuevo del ALB.
+
+4. **Domain forwarding del apex** (solo la primera vez, esto sí sobrevive): `secretsapi.online` (pelado) → `https://app.secretsapi.online`, pestaña **Forwarding** en GoDaddy (no es un registro DNS).
+
+5. **Primer deploy del front**: push a `main` en `secrets-app` (o "Re-run all jobs" en Actions si ya hay un commit en main) — dispara `deploy.yml`: build con el `GH_PACKAGES_TOKEN` (paquete privado `@secrets-27222633/sdk`) y `NEXT_PUBLIC_API_URL=https://api.secretsapi.online` horneado en build-time, push a ECR, registra task definition, actualiza el servicio. `AWS_GITHUB_ACTIONS_ROLE_ARN` y `GH_PACKAGES_TOKEN` ya están guardados como secrets del repo — no hace falta tocarlos de nuevo.
+
+6. **Verificar**: `https://app.secretsapi.online` (front) y `https://api.secretsapi.online/health` (API) deberían responder. Login de GitHub OAuth ya apunta al callback correcto (`https://app.secretsapi.online/api/auth/callback/github`) — no hace falta tocar la OAuth App de GitHub de nuevo.
+
+### 10.3 Bugs reales que ya están arreglados en el código (no deberían volver a aparecer)
+
+- **`gid '1000' in use`** al buildear la imagen del front: `node:20-alpine` ya trae un usuario `node` en uid/gid 1000 — el Dockerfile lo reusa, no crea uno nuevo.
+- **`npm error 401` bajando `@secrets-27222633/sdk`**: paquete privado de GitHub Packages en un org distinto al del repo — el `GITHUB_TOKEN` automático de Actions no alcanza. El build usa `GH_PACKAGES_TOKEN` (PAT con `read:packages`) vía secret mount de BuildKit (`--secret id=github_token,env=GITHUB_TOKEN`), nunca queda en una capa de la imagen.
+- **Login roto con "the redirect_uri is not associated with this application"**: el Redirect URI de la OAuth App de GitHub apuntaba a `api.secretsapi.online` — el callback de NextAuth vive en el **front**, tiene que ser `https://app.secretsapi.online/api/auth/callback/github`.
+- **El front seguía llamando a `tek-secrets.onrender.com` (CORS) aunque `NEXT_PUBLIC_API_URL` estaba seteado en la task definition**: `NEXT_PUBLIC_*` se hornea en el bundle del navegador durante `next build`, no en runtime — un env var de ECS no sirve para el código que corre en el browser. Se pasa como `--build-arg` en el `docker build` del workflow (ver `Dockerfile`, `ARG NEXT_PUBLIC_API_URL`).
+- **`aws_ecs_service.api/front: does not have an associated load balancer`**: el `depends_on` de los services no incluía el listener/listener rule que realmente asocia cada target group al ALB (con dominio configurado, `http_redirect` deja de hacer forward a la API). Ver `depends_on` en `04-ecs.tf`.
+- **Task del front matado por "failed container health checks" pese a loguear "Ready" casi al instante**: el healthcheck original (`node -e fetch(...)`) levanta un proceso Node/V8 entero cada 30s — en 0.25 vCPU eso compite por CPU con el propio server y puede pasarse del timeout bajo throttling real. Se cambió a `wget` (BusyBox, ~10x más liviano) contra `127.0.0.1` explícito (no `localhost`: musl/Alpine lo resuelve a `::1` primero y el server solo escucha IPv4).
+
+### 10.4 Hiccups transitorios (no son bugs, solo timing de AWS)
+
+- **`aws_ecs_service.api: Create service is not idempotent`**: AWS ECS tarda unos minutos en liberar el nombre de un service recién borrado. Se resuelve solo reintentando `terraform apply` un rato después.
+- **`aws_cloudwatch_log_group.*: ResourceAlreadyExistsException`**: si un log group sobrevivió al destroy (huérfano, no quedó en el state), se importa en vez de recrear:
+  ```bash
+  terraform import aws_cloudwatch_log_group.<nombre> /ruta/del/log/group
+  ```
+
+Ninguno de los dos bloquea que el resto del `apply` avance — Terraform sigue con lo demás y solo reintentás lo que falló.
+
+### 10.5 Costo — apagar cuando no se usa
+
+Todo esto es infraestructura *always-on* que cobra por hora exista o no
+tráfico (EC2, NAT Gateway, ALB, Fargate, 7 VPC Interface Endpoints). Estimado
+en cero uso: **~$280-300/mes**. Si no se necesita corriendo todo el tiempo,
+`terraform destroy` cuando no se usa y `terraform apply` (siguiendo este
+runbook) cuando sí — evita pagar semanas muertas.
+
 ---
 
 ## Qué NO va a funcionar todavía
@@ -278,9 +356,9 @@ Todas las variables de esta tabla viven en
 |---|---|---|
 | `github_client_id`, `github_client_secret` | Placeholders (`CHANGEME_...`) | Pon las credenciales reales de tu GitHub OAuth App en `terraform.tfvars` y corre `terraform apply` (solo esos 2 secretos se actualizan) |
 | `rotation_api_token` | Placeholder (`tok_placeholder_update_after_deploy`) | Emite un token real desde la API ya corriendo, ponlo en `terraform.tfvars`, `terraform apply` |
-| `acm_certificate_arn`, `domain_name` | Vacíos (tesis/dev, ALB en HTTP directo) | Configura un certificado ACM y pon su ARN + tu dominio en `terraform.tfvars`, `terraform apply` |
+| Front (`aws_ecs_service.front`) | El repo ECR `tek-secrets-v2-front` esta vacio hasta el primer push a `main` de `secrets-app` | Ver sección 10 — orden: `terraform apply` primero, GitHub Actions después |
 
-Ninguno de los tres bloquea que el resto de la infraestructura funcione.
+Ninguno bloquea que el resto de la infraestructura funcione.
 
 ---
 
