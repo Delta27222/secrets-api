@@ -1,3 +1,8 @@
+# Blueprint spec: https://render.com/docs/blueprint-spec
+# Env vars: https://render.com/docs/configure-environment-variables
+# Ver README_RECORRIDO_SYNC.md para cómo la API sincroniza secretos HACIA
+# un servicio de Render ya desplegado (distinto de este archivo, que es el
+# propio deploy de la API en Render).
 services:
   - type: web
     name: tek-secrets-api

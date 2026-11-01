@@ -1,7 +1,7 @@
 import boto3
 import json
 import logging
-from ..core.config import SQS_QUEUE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION_NAME
+from ..core.config import SQS_QUEUE_URL, AWS_REGION_NAME
 from ..models.sync import SqsParameters
 from datetime import datetime
 
@@ -10,15 +10,15 @@ logger = logging.getLogger(__name__)
 _sqs_client = None
 
 def _get_sqs_client():
-    """Singleton para el cliente SQS."""
+    """Singleton para el cliente SQS.
+
+    Sin credenciales explícitas: boto3 usa su cadena de credenciales default,
+    que en ECS toma el IAM Task Role automáticamente vía metadata. Pasar
+    AWS_ACCESS_KEY_ID/SECRET a mano (código viejo de Render) rompe esto en AWS.
+    """
     global _sqs_client
-    if _sqs_client is None and all([SQS_QUEUE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]):
-        _sqs_client = boto3.client(
-            'sqs',
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region_name=AWS_REGION_NAME
-        )
+    if _sqs_client is None and SQS_QUEUE_URL:
+        _sqs_client = boto3.client('sqs', region_name=AWS_REGION_NAME)
     return _sqs_client
 
 def send_log_to_sqs(log_data: SqsParameters):

@@ -12,9 +12,16 @@ from ..core.logging import create_service_logger
 
 collection_name = environments_collection_name
 
+DEFAULT_VERCEL_TARGETS = ["production", "preview", "development"]
+
+
 async def fetch_project_from_vercel(project_id: str, token: str) -> Optional[Dict[str, Any]]:
     """
     Fetch project details from Vercel using the project ID and token, to take the target from the first environment variable.
+
+    Si el proyecto existe pero todavía no tiene ninguna env var cargada en Vercel,
+    no hay de dónde inferir el target real -> se usan los targets default de Vercel
+    en vez de tratarlo como "proyecto no encontrado".
     """
 
     url = f"{VERCEL_API_URL}/{project_id}"
@@ -31,11 +38,11 @@ async def fetch_project_from_vercel(project_id: str, token: str) -> Optional[Dic
 
     env = project_data.get("env")
     if not env or not isinstance(env, list) or len(env) == 0:
-        return None
+        return DEFAULT_VERCEL_TARGETS
 
     target = env[0].get("target")
     if not target:
-        return None
+        return DEFAULT_VERCEL_TARGETS
 
     return target
 
