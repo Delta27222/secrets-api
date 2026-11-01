@@ -13,8 +13,9 @@
 # ============================================================================
 
 resource "aws_backup_vault" "main" {
-  name        = "${var.project_name}-backup-vault"
-  kms_key_arn = null # null = clave administrada por AWS (aws/backup)
+  name          = "${var.project_name}-backup-vault"
+  kms_key_arn   = null # null = clave administrada por AWS (aws/backup)
+  force_destroy = true # permite destruir el vault aunque tenga recovery points
 
   tags = { Name = "${var.project_name}-backup-vault" }
 }
