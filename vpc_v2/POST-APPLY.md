@@ -54,6 +54,116 @@ dig +short app.secretsapi.online
 curl -s https://api.secretsapi.online/health
 ```
 
+### 1.1 Si `app.secretsapi.online` da `503 Service Unavailable`: desplegar el front
+
+Un 503 del ALB significa que el target group del front **no tiene tareas
+sanas**. Después de un apply que recrea el repo ECR
+`tek-secrets-v2-front`, el repo queda **vacío**: Terraform no construye la
+imagen del front, la construye GitHub Actions (`deploy.yml` en
+`Delta27222/secrets-app`), y ese workflow **solo se dispara con un push a
+`main`**. Hasta que corra, el servicio ECS no puede arrancar tareas. La API
+no tiene este problema porque su imagen la publica Terraform
+(`04-api-image.tf`).
+
+**Confirmar el diagnóstico:**
+```bash
+# El repo del front no debe tener tags (vacío = este problema)
+aws ecr list-images --region us-east-1 \
+  --repository-name tek-secrets-v2-front --query 'imageIds[].imageTag'
+
+# El servicio muestra running 0 y el error de pull
+aws ecs describe-services --region us-east-1 \
+  --cluster tek-secrets-v2-cluster --services tek-secrets-v2-front-service \
+  --query 'services[0].{desired:desiredCount,running:runningCount,events:events[0:3].message}'
+```
+Evento típico:
+```
+CannotPullContainerError: ... tek-secrets-v2-front:latest: not found
+```
+
+**Arreglo:** volver a correr el último deploy exitoso del front. Los
+secrets de GitHub no se tocan: `AWS_GITHUB_ACTIONS_ROLE_ARN` es
+determinístico (mismo nombre de rol, mismo ARN aunque se recree).
+
+```bash
+# Buscar el último run exitoso de "Deploy front a ECS"
+gh run list -R Delta27222/secrets-app --workflow deploy.yml --status success -L 1
+
+# Re-ejecutarlo (reemplazar por el ID de arriba; ej. 37103806476)
+gh run rerun 37103806476 -R Delta27222/secrets-app
+
+# Seguirlo en vivo
+gh run watch -R Delta27222/secrets-app
+```
+
+Alternativa: hacer cualquier push a `main` del front, por ejemplo un commit
+vacío (`git commit --allow-empty -m "chore: redeploy" && git push`).
+
+El deploy tarda ~8–12 min. Al terminar, verificar:
+```bash
+aws ecs describe-services --region us-east-1 \
+  --cluster tek-secrets-v2-cluster --services tek-secrets-v2-front-service \
+  --query 'services[0].{desired:desiredCount,running:runningCount}'
+curl -sI https://app.secretsapi.online | head -1
+```
+Debe quedar `running: 1` y el `curl` debe devolver `200` (o un `307` hacia
+el login).
+
+Si el rerun falla:
+- **En `Configure AWS credentials`** (`AssumeRoleWithWebIdentity`): falta
+  el secret `AWS_GITHUB_ACTIONS_ROLE_ARN` o `github_repo_front` no coincide
+  con el repo. Ver sección 3 de `GODADDY-GITHUB-SETUP.md`.
+- **En `Build y push de la imagen`** con `npm ci` y `E401` (ver abajo).
+
+#### Error `E401 Unauthorized` en `npm ci` (token de paquetes vencido)
+
+En el log del paso `Build y push de la imagen` se ve algo así:
+```
+ERROR: failed to build: failed to solve: process "/bin/sh -c npm ci" did not complete successfully: exit code: 1
+```
+Ese mensaje no dice la causa. Para verla:
+```bash
+ID=$(gh run list -R Delta27222/secrets-app --workflow deploy.yml -L 1 \
+  --json databaseId -q '.[0].databaseId')
+gh run view $ID -R Delta27222/secrets-app --log-failed | grep -iE "npm error|E40[0-9]"
+```
+Si aparece:
+```
+npm error code E401
+npm error 401 Unauthorized - GET https://npm.pkg.github.com/download/@secrets-27222633/sdk/...
+unauthenticated: User cannot be authenticated with the token provided.
+```
+el build no puede bajar el paquete privado `@secrets-27222633/sdk` porque
+el secret `GH_PACKAGES_TOKEN` del repo **venció o fue revocado**. El paso
+de AWS (OIDC) no tiene que ver con este error.
+
+**Arreglo:**
+
+1. **Crear un token nuevo:** GitHub → **Settings → Developer settings →
+   Personal access tokens → Tokens (classic) → Generate new token
+   (classic)**.
+   - Scope: solo **`read:packages`**.
+   - Expiration: una fecha posterior a la defensa, para que no vuelva a
+     vencer en el medio.
+   - Si la org `secrets-27222633` usa SSO: **Configure SSO → Authorize**
+     para esa org.
+2. **Actualizar el secret.** Con `gh` lo pide por stdin, así el token no
+   queda en el historial de la terminal:
+   ```bash
+   gh secret set GH_PACKAGES_TOKEN -R Delta27222/secrets-app
+   ```
+   O en la web: repo → **Settings → Secrets and variables → Actions →
+   `GH_PACKAGES_TOKEN` → Update**.
+3. **Relanzar el run fallido**, que construye el último commit de `main`:
+   ```bash
+   gh run rerun $ID -R Delta27222/secrets-app
+   gh run watch -R Delta27222/secrets-app
+   ```
+
+Si después de cambiar el token sigue dando `403` en lugar de `401`, el
+token es válido pero no tiene acceso al paquete. Revisar que tenga
+`read:packages` y que esté autorizado en la org (SSO).
+
 ---
 
 ## 2. Entrar a QuestDB
@@ -255,7 +365,7 @@ Si imprime `tok_placeholder_...`, hacer estos pasos:
      exige `project_id` y los tokens de sistema van con `null`. Con el
      túnel de Mongo abierto (sección 3), correr una vez:
      ```bash
-     python3 ../rotation/scripts/relax_service_token_validator.py \
+     python3 ~/Desktop/tesis/tek-secrets/rotation/scripts/relax_service_token_validator.py \
        --mongodb-url "<url de 3.2>" --db secrets-27222
      ```
 2. **Guardarlo** en `vpc_v2/terraform/terraform.tfvars`:
@@ -366,6 +476,117 @@ Verificar que re-encriptó:
 | `HTTP 404` / `422` | `PROJECT_ID` vacío o incorrecto | Revisar `echo $PROJECT_ID` (5.2) |
 | `dquote>` en la terminal | Comillas sin cerrar en `--payload` | `Ctrl+C`, usar la versión con comillas simples |
 | Master responde `projects_queued: 0` | Ningún proyecto vencido | Usar B o C para forzar uno |
+
+---
+
+## 6. Cargar datos de demo (organización + 2 proyectos + variables)
+
+Script: `tek-secrets/api/scripts/seed_via_api.py`. Va por la API pública,
+así que **no necesita túneles** y los secretos quedan cifrados con la llave
+de cada proyecto, como si se cargaran desde la app. Usa solo la librería
+estándar de Python, sin venv.
+
+Qué crea:
+- La organización `Avila Tek`. Tu usuario queda como owner.
+- Dos proyectos, `Tienda Online` y `Servicio de Pagos`. La API les genera
+  `dev`/`stg`/`prd` y la llave de encriptación.
+- Cinco variables por ambiente.
+- Las credenciales de **Render y Vercel**, solo en el ambiente **Staging**
+  (`stg`) de cada proyecto. Vercel queda con target `preview`.
+
+Las credenciales de Render y Vercel **no van en el script**. Se leen de
+`tek-secrets/api/scripts/.seed.env`, que git ignora (`*.env`):
+```
+RENDER_SERVICE_ID=srv-...
+RENDER_API_TOKEN=rnd_...
+VERCEL_PROJECT_ID=prj_...
+VERCEL_TOKEN=vcp_...
+VERCEL_TARGET=preview
+```
+**Tokens de sistema:** el script también crea 4 tokens de sistema, que se
+ven en **Organización → Tokens**:
+
+| Token | Scopes | Expira | Uso al crearlo |
+|---|---|---|---|
+| `lambda-rotation-xxxx` | `keys:rotate` | 365 d | No se usa (rotaría llaves) |
+| `ci-deploy-reader-xxxx` | `projects:list`, `projects:read`, `environments:list` | 90 d | 3 llamadas |
+| `auditoria-org-xxxx` | `org:read`, `projects:list` | 180 d | 2 llamadas |
+| `monitoreo-inventario-xxxx` | `projects:list`, `projects:read`, `environments:list` | 30 d | 2 llamadas |
+
+Los tres que se usan hacen llamadas de prueba a `/v1/service/*`, así que en
+la app aparecen con su **último uso**. Los secretos se guardan en
+`tek-secrets/api/scripts/.seed-tokens.env`, con permisos `600` e ignorado
+por git; es la única copia. El de `lambda-rotation` sirve como
+`rotation_api_token` (sección 5.1).
+
+**Tokens de proyecto:** además, en **cada proyecto** se crean 4 tokens, que
+se ven en la pestaña Tokens del proyecto:
+
+| Token | Ambiente | Scopes | Expira | Llamadas de prueba |
+|---|---|---|---|---|
+| `backend-produccion-xxxx` | `prd` | `secrets:read` | 90 d | lee los secretos de prd |
+| `backend-staging-xxxx` | `stg` | `secrets:read`, `environments:read` | 60 d | lee secretos y datos de stg |
+| `dev-local-xxxx` | `dev` | `secrets:read` | 30 d | lee los secretos de dev |
+| `ci-pipeline-xxxx` | todos | `projects:read`, `environments:list` | 180 d | lee el proyecto y lista sus ambientes |
+
+Sus secretos van al mismo `.seed-tokens.env`, agrupados por proyecto.
+
+```bash
+python3 scripts/seed_via_api.py --no-project-tokens    # sin tokens de proyecto
+python3 scripts/seed_via_api.py --no-system-tokens     # sin tokens de sistema
+python3 scripts/seed_via_api.py --only-system-tokens   # solo tokens
+```
+Con `--only-system-tokens` no se crea nada más, pero tu usuario ya tiene
+que ser owner o admin de alguna organización. Si da `Document failed
+validation`, hay que relajar el validador de Mongo una vez (ver 5.1).
+
+Si el archivo de credenciales no existe o le faltan las de un proveedor, el
+script avisa y saltea ese proveedor. Las variables de entorno con el mismo nombre pisan al
+archivo.
+
+Para autenticarse usa tu token de GitHub, el mismo usuario que entra a la
+app. La API lee tu email primario, así que el token de `gh` necesita el
+scope `user:email`. Se agrega una sola vez:
+```bash
+gh auth refresh -h github.com -s user:email
+```
+
+Correrlo:
+```bash
+cd tek-secrets/api
+python3 scripts/seed_via_api.py                         # contra https://api.secretsapi.online
+python3 scripts/seed_via_api.py --org-name "Demo Defensa"
+python3 scripts/seed_via_api.py -p "Portal Clientes" -p "API Inventario"   # nombres propios
+python3 scripts/seed_via_api.py --api-url http://localhost:8000   # API local
+python3 scripts/seed_via_api.py --help                  # todas las opciones con ejemplos
+```
+
+Todas las opciones:
+
+| Flag | Qué hace | Default |
+|---|---|---|
+| `--org-name`, `-o NOMBRE` | Nombre de la organización | `Avila Tek` |
+| `--project`, `-p NOMBRE` | Nombre de un proyecto; repetirlo para varios (`-p "A" -p "B"`). Toman en orden las plantillas de variables | `Tienda Online` y `Servicio de Pagos` |
+| `--api-url URL` | URL de la API | `TEK_API_URL` o `https://api.secretsapi.online` |
+| `--token TOKEN` | Token de GitHub (con scope `user:email`) | `GITHUB_TOKEN` o `gh auth token` |
+| `--no-project-tokens` | No crea los 4 tokens de cada proyecto | se crean |
+| `--no-system-tokens` | No crea los 4 tokens de sistema | se crean |
+| `--only-system-tokens` | Solo crea los tokens de sistema, sin org ni proyectos | — |
+
+`--no-system-tokens` y `--only-system-tokens` no se pueden combinar.
+
+Ejemplo con todo personalizado:
+```bash
+python3 scripts/seed_via_api.py -o "Demo Defensa" \
+  -p "Portal Clientes" -p "API Inventario" -p "App Móvil"
+```
+
+Los slugs llevan un sufijo aleatorio, así que se puede correr varias veces;
+cada corrida crea una organización nueva. Para cambiar los proyectos o las
+variables, editar la lista `PROJECTS` al inicio del script.
+
+Si da `HTTP 401 Token inválido`, falta el scope `user:email` (ver arriba) o
+el token venció (`gh auth login`).
 
 ---
 

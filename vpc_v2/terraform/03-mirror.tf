@@ -17,6 +17,10 @@
 resource "null_resource" "ecr_login" {
   triggers = {
     registry = local.ecr_registry
+    # El token de ECR expira a las 12 h. Sin esto, el login solo corría en el
+    # primer apply y un re-apply posterior (p. ej. tras un mirror fallido)
+    # empujaba sin credenciales: "no basic auth credentials".
+    always_run = timestamp()
   }
 
   provisioner "local-exec" {
