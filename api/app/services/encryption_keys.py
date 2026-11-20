@@ -14,7 +14,7 @@ from typing import Optional, Dict, Any
 import httpx
 import logging
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from ..core.config import (
@@ -313,6 +313,35 @@ class EncryptionKeyManager:
         # Desencriptar key_material con CSFLE
         raw_key_material = decrypt_field(key_doc["key_material"])
         return Fernet(raw_key_material.encode())
+
+    async def get_all_keys(
+        self,
+        conn: AsyncIOMotorClient,
+        project_id: Optional[str] = None
+    ) -> MultiFernet:
+        """
+        Obtiene todas las llaves del proyecto como MultiFernet.
+
+        La llave activa va primero (se usa para encriptar y en `rotate`);
+        el resto, de la versión más nueva a la más vieja, permite desencriptar
+        valores que quedaron cifrados con llaves ya deprecadas.
+
+        Raises:
+            ValueError: Si el proyecto no tiene llaves
+        """
+        db = conn[database_name]
+        key_docs = await db[encryption_keys_collection_name].find(
+            {"project_id": project_id, "status": {"$in": ["active", "deprecated"]}},
+            {"key_material": 1, "is_primary": 1, "version": 1}
+        ).to_list(None)
+
+        if not key_docs:
+            raise ValueError(f"❌ No hay llaves para proyecto {project_id}")
+
+        key_docs.sort(key=lambda k: (not k.get("is_primary", False), -k.get("version", 0)))
+        return MultiFernet([
+            Fernet(decrypt_field(k["key_material"]).encode()) for k in key_docs
+        ])
 
     async def get_key_metadata(
         self,

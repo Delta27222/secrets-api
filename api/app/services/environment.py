@@ -78,17 +78,34 @@ async def _get_environment_by_slug(target_id: str, environment: EnvironmentInDB)
     return EnvironmentInDB(**environment)
 
 
+INTEGRATION_FIELDS = ("render_token", "render_server_id", "vercel_token", "vercel_project_id")
+
+
 async def _decrypt_single_field(conn: AsyncIOMotorClient, project_id: str, encrypted_value: str) -> Optional[str]:
-    """Decrypt a single field using the project's active key."""
+    """Decrypt a single field trying the active key first, then deprecated ones."""
     if not encrypted_value:
         return None
     try:
         manager = get_key_manager()
-        fernet = await manager.get_active_key(conn, project_id)
+        fernet = await manager.get_all_keys(conn, project_id)
         return fernet.decrypt(encrypted_value.encode()).decode()
     except Exception as e:
-        logger.error(f"Error decrypting field: {e}")
+        logger.error(f"Error decrypting field: {e}", exc_info=True)
         return None
+
+
+async def reencrypt_integration_fields(conn: AsyncIOMotorClient, environment: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Re-encrypts the Render/Vercel fields of an environment with the project's active key.
+    Returns only the fields that were re-encrypted, ready to be used in a $set.
+    """
+    fields = {k: environment[k] for k in INTEGRATION_FIELDS if environment.get(k)}
+    if not fields:
+        return {}
+
+    manager = get_key_manager()
+    fernet = await manager.get_all_keys(conn, environment.get("project_id"))
+    return {k: fernet.rotate(v.encode()).decode() for k, v in fields.items()}
 
 
 async def get_render_info(conn: AsyncIOMotorClient, project_id: str, slug: str) -> Optional[EnvironmentRenderData]:

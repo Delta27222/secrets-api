@@ -24,6 +24,11 @@ app.add_middleware(
 )
 app.add_middleware(LoggingMiddleware)
 
+@app.get("/health")
+async def health():
+    """Health check para el target group del ALB y el healthcheck de ECS."""
+    return {"status": "ok"}
+
 @app.on_event("startup")
 async def on_startup():
     """Ejecuta al iniciar la aplicación."""
